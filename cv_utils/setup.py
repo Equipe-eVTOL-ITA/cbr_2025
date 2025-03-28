@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-package_name = 'frtl_2024_cv_utils'
+package_name = 'cbr_cv_utils'
 
 setup(
     name=package_name,

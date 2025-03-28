@@ -108,7 +108,7 @@ private:
     std::deque<float> bboxes_buffer;
     bool at_approximate_base = false;
     Eigen::Vector3d pos, approx_goal, little_goal;
-    float max_velocity = 0.9;
+    float max_velocity = 1.5;
     float initial_yaw;
 
     void updateBBoxesBuffer(float new_center_x)

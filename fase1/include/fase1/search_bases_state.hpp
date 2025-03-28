@@ -88,14 +88,14 @@ private:
     std::vector<ArenaPoint>* waypoints;
     ArenaPoint* goal_ptr;
     Eigen::Vector3d pos, goal, goal_diff;
-    const float max_velocity = 0.4;
+    const float max_velocity = 0.7;
     float initial_yaw;
     
     Eigen::Vector2d getApproximateBase(double x, double y) {
-        double x_max_dist = 2.3; //distance on ground from left to right of picture when flying at takeoff altitude
+        double x_max_dist = 3.0; //distance on ground from left to right of picture when flying at takeoff altitude
         double y_max_dist = x_max_dist * 3 / 4; //based on 4:3 image proportion - from up to down
 
-        double avg_hgt = 2.5; // Averaged distance to landing pad
+        double avg_hgt = 3.0; // Averaged distance to landing pad
 
         //Considering that pixel dimensions are like angular resolution
         double k_x = std::atan((x_max_dist / 2) / avg_hgt);

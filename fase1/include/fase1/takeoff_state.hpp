@@ -54,6 +54,6 @@ private:
     bool finished_bases_;
     Drone* drone_;
     Eigen::Vector3d pos_, goal_, goal_diff, little_goal;
-    float max_velocity = 1.0;
+    float max_velocity = 1.5;
     float initial_yaw;
 };

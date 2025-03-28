@@ -78,7 +78,7 @@ private:
     bool over_base_ = false;
     Eigen::Vector3d home_pos_, pos_, home_horizon_, goal_, goal_diff, little_goal_;
     Drone* drone_;
-    const float max_velocity = 0.7;
+    const float max_velocity = 1.3;
     std::chrono::steady_clock::time_point start_time_; 
     float initial_yaw;
 };
