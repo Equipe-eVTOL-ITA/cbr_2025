@@ -21,6 +21,7 @@ public:
     }
 
     std::string act(fsm::Blackboard &blackboard) override {
+        (void) blackboard;
         
         pos = drone->getLocalPosition();
 
