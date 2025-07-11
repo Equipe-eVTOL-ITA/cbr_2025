@@ -13,11 +13,15 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <geometry_msgs/msg/vector3_stamped.hpp>
 #include <custom_msgs/msg/gesture.hpp>
 #include <custom_msgs/msg/hand_location.hpp>
 #include <custom_msgs/msg/bar_code.hpp>
 #include <custom_msgs/msg/multi_bar_code.hpp>
+#include <custom_msgs/msg/position.hpp>
 #include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 #include <px4_msgs/msg/vehicle_status.hpp>
 #include <px4_msgs/msg/vtol_vehicle_status.hpp>
@@ -110,6 +114,8 @@ struct BoundingBox
 	double center_y;
 	double size_x;
 	double size_y;
+	double confidence = 0.0;
+	std::string class_id = "-1";
 };
 } // namespace DronePX4
 
@@ -173,6 +179,8 @@ public:
 
 	void setAirSpeed(float speed);
 
+	void dropGancho();
+
 	void setOffboardControlMode(DronePX4::CONTROLLER_TYPE type);
 	
 	void toOffboardSync();
@@ -193,6 +201,8 @@ public:
 
 	cv_bridge::CvImagePtr& getHorizontalImage();
 	cv_bridge::CvImagePtr& getVerticalImage();
+	cv_bridge::CvImagePtr& getAngledImage();
+
 
 	void create_image_publisher(const std::string& topic_name);
 	void publish_image(const std::string& topic_name, const cv_bridge::CvImagePtr& cv_ptr);
@@ -202,11 +212,79 @@ public:
 	std::array<float, 2> getHandLocation();
 	void resetHands();
 
-	std::vector<DronePX4::BoundingBox> getBoundingBox();
+	std::vector<DronePX4::BoundingBox> getVerticalBboxes();
+	std::vector<DronePX4::BoundingBox> getAngledBboxes();
+	std::vector<DronePX4::BoundingBox> getPostDetections();
 
 	std::vector<Eigen::Vector4d> getBarCodeLocation();
 
 	std::string readQRCode();
+	
+	/*
+		Line Following and Hose Detection Interface for Fase2
+	*/
+	
+	// Blue line detection data
+	struct LineDetectionData {
+		bool has_detection = false;
+		double centroid_x = 0.5;
+		double centroid_y = 0.5;
+		double direction_angle = 0.0;
+		double confidence = 0.0;
+		std::chrono::steady_clock::time_point last_update;
+	};
+	
+	// Hose detection data
+	struct HoseDetectionData {
+		bool has_detection = false;
+		double position_x = 0.5;
+		double position_y = 0.5;
+		double confidence = 0.0;
+		std::chrono::steady_clock::time_point last_update;
+	};
+	
+	LineDetectionData getLineDetection();
+	HoseDetectionData getHoseDetection();
+	bool isLineDetectionRecent(double timeout_seconds = 0.5);
+	bool isHoseDetectionRecent(double timeout_seconds = 1.0);
+	
+	/*
+		SAE 2025 Phase 2 Enhanced Interface
+	*/
+	
+	// Mangueira (hose) detection data from vision_msgs::Detection2DArray
+	std::vector<DronePX4::BoundingBox> getMangueiraDetections();
+	
+	// Mangueira angle from /mangueira/angle topic (Float64)  
+	double getMangueiraAngle();
+	bool isMangueiraAngleRecent(double timeout_seconds = 1.0);
+	
+	// Blue base detection data from vision_msgs::Detection2DArray
+	std::vector<DronePX4::BoundingBox> getBlueDetections();
+	
+	/*
+		Subscription Management for Performance Optimization
+	*/
+	
+	// Enable/disable specific subscriptions to reduce overhead
+	void enableCameraSubscriptions(bool vertical = true, bool horizontal = true, bool angled = true);
+	void disableCameraSubscriptions();
+	void enableComputerVisionSubscriptions(bool vertical = true, bool angled = true);
+	void disableComputerVisionSubscriptions();
+	void enableCustomMessageSubscriptions(bool gestures = true, bool hand_location = true, bool barcodes = true, bool qr_codes = true);
+	void disableCustomMessageSubscriptions();
+	
+	// Check subscription status
+	bool isCameraSubscriptionActive(const std::string& camera_type) const;
+	bool isComputerVisionSubscriptionActive(const std::string& cv_type) const;
+	bool isCustomMessageSubscriptionActive(const std::string& msg_type) const;
+	
+	// Performance monitoring
+	void printSubscriptionStats();
+	size_t getActiveSubscriptionCount() const;
+	
+	// Optimized QoS profiles for different subscription types
+	static rclcpp::QoS getOptimizedQoS(const std::string& subscription_type);
 	
 private:
 	/// Send command to PX4
@@ -263,7 +341,13 @@ private:
 
 	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr vertical_camera_sub_;
 
-	rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr classification_sub_;
+	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr angled_camera_sub_;
+
+	rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr vertical_classification_sub_;
+
+	rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr angled_classification_sub_;
+
+	rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr post_detection_sub_;
 
 	rclcpp::Subscription<custom_msgs::msg::Gesture>::SharedPtr gesture_sub_;
 
@@ -272,6 +356,19 @@ private:
 	rclcpp::Subscription<custom_msgs::msg::MultiBarCode>::SharedPtr bar_code_sub_;
 
 	rclcpp::Subscription<std_msgs::msg::String>::SharedPtr qr_code_sub_;
+
+	// Line and hose detection subscriptions for Fase2
+	rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr line_centroid_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr line_direction_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr hose_detection_sub_;
+	
+	// SAE 2025 Phase 2 enhanced subscriptions
+	rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr mangueira_detections_sub_;
+	rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr mangueira_angle_sub_;
+	rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr blue_detections_sub_;
+
+	rclcpp::Publisher<custom_msgs::msg::Position>::SharedPtr position_pub_;
+	rclcpp::TimerBase::SharedPtr position_timer_;
 
 
 	// Service clients
@@ -296,6 +393,7 @@ private:
 	float airspeed_{0};
 	cv_bridge::CvImagePtr horizontal_cv_ptr_;
 	cv_bridge::CvImagePtr vertical_cv_ptr_;
+	cv_bridge::CvImagePtr angled_cv_ptr_;
 
 	uint8_t target_component_{1};
 	uint8_t source_system_{255};
@@ -312,8 +410,8 @@ private:
 	float pitch_{0};
 	float yaw_{0};
 
-	Eigen::Vector3d frd_home_position_;
-	Eigen::Vector3d ned_home_position_;
+	Eigen::Vector3d frd_home_position_ = Eigen::Vector3d::Zero();
+	Eigen::Vector3d ned_home_position_ = Eigen::Vector3d::Zero();
 	float initial_yaw_{0};
 
     Eigen::Vector3d convertPositionNEDtoFRD(const Eigen::Vector3d& position_ned) const;
@@ -321,13 +419,16 @@ private:
     Eigen::Vector3d convertVelocityNEDtoFRD(const Eigen::Vector3d& velocity_ned) const;
     Eigen::Vector3d convertVelocityFRDtoNED(const Eigen::Vector3d& velocity_frd) const;
 
-	std::vector<DronePX4::BoundingBox> detections_{};
+	std::vector<DronePX4::BoundingBox> vertical_detections_{};
+	std::vector<DronePX4::BoundingBox> angled_detections_{};
+	std::vector<DronePX4::BoundingBox> post_detections_{};
 	std::vector<Eigen::Vector4d> barcode_detections_ {};
 
 	float bbox_center_x_{0.0};
 	float bbox_center_y_{0.0};
 	float bbox_size_x_{0.0};
 	float bbox_size_y_{0.0};
+	std::string bbox_class_id_{""};
 
 	std::vector<std::string> gestures_{"", ""};
 
@@ -336,7 +437,42 @@ private:
 
 	std::string qr_code_data_{""}; 
 
+	// Line following and hose detection data for Fase2
+	LineDetectionData line_detection_data_;
+	HoseDetectionData hose_detection_data_;
+	
+	// SAE 2025 Phase 2 enhanced detection data
+	std::vector<DronePX4::BoundingBox> mangueira_detections_;
+	std::vector<DronePX4::BoundingBox> blue_detections_;
+	double mangueira_angle_ = 0.0;
+	std::chrono::steady_clock::time_point mangueira_angle_last_update_;
+	std::chrono::steady_clock::time_point mangueira_detections_last_update_;
+	std::chrono::steady_clock::time_point blue_detections_last_update_;
+
 	std::unordered_map<std::string, rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr> image_publishers_;
+	
+	// Subscription state tracking for optimization
+	struct SubscriptionState {
+		bool vertical_camera_active = false;
+		bool horizontal_camera_active = false; 
+		bool angled_camera_active = false;
+		bool vertical_cv_active = true;  // Keep CV active by default since used by FSM
+		bool angled_cv_active = false;    // Keep CV active by default since used by FSM
+		bool post_detections_active = false; // Keep post detections active for slalom
+		bool gestures_active = false;     // Keep custom messages active by default
+		bool hand_location_active = false;
+		bool barcodes_active = false;
+		bool qr_codes_active = false;
+		bool line_detection_active = false;  // For fase2 line following
+		bool hose_detection_active = false;  // For fase2 hose detection
+		bool mangueira_detections_active = false;  // For SAE 2025 Phase 2 hose detections
+		bool mangueira_angle_active = false;       // For SAE 2025 Phase 2 hose angle
+		bool blue_detections_active = false;       // For SAE 2025 Phase 2 blue base detections
+	} subscription_state_;
+	
+	// Performance tracking
+	mutable std::chrono::time_point<std::chrono::high_resolution_clock> last_stats_print_;
+	mutable size_t total_message_count_ = 0;
 	
 	static std::unordered_map<std::string, std::string> encoding_map_;
 };

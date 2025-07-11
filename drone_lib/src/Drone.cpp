@@ -16,6 +16,7 @@
 #include <custom_msgs/msg/hand_location.hpp>
 #include <custom_msgs/msg/bar_code.hpp>
 #include <custom_msgs/msg/multi_bar_code.hpp>
+#include <custom_msgs/msg/position.hpp>
 #include "std_msgs/msg/string.hpp"
 
 
@@ -34,8 +35,15 @@ Drone::Drone() {
 		}
 	);
 
-	rclcpp::QoS qos_profile(10);
-	qos_profile.best_effort();
+	// Initialize performance tracking
+	this->last_stats_print_ = std::chrono::high_resolution_clock::now();
+	this->total_message_count_ = 0;
+
+	// Use optimized QoS profiles for different subscription types
+	auto px4_qos = getOptimizedQoS("px4");
+	auto camera_qos = getOptimizedQoS("camera");
+	auto cv_qos = getOptimizedQoS("computer_vision");
+	auto custom_qos = getOptimizedQoS("custom");
 
 	std::string vehicle_id_prefix = "";
 
@@ -47,8 +55,9 @@ Drone::Drone() {
 
 	this->vehicle_status_sub_ = this->px4_node_->create_subscription<px4_msgs::msg::VehicleStatus>(
 		vehicle_id_prefix + "/fmu/out/vehicle_status",
-		qos_profile,
+		px4_qos,
 		[this](px4_msgs::msg::VehicleStatus::ConstSharedPtr msg) {
+		this->total_message_count_++;
 		auto set_arm_disarm_reason = [](uint8_t reason)
 		{
 			DronePX4::ARM_DISARM_REASON value;
@@ -204,16 +213,18 @@ Drone::Drone() {
 
 	this->vehicle_timesync_sub_ = this->px4_node_->create_subscription<px4_msgs::msg::TimesyncStatus>(
 		vehicle_id_prefix + "/fmu/out/timesync_status",
-		qos_profile,
+		px4_qos,
 		[this](px4_msgs::msg::TimesyncStatus::ConstSharedPtr msg) {
+		this->total_message_count_++;
 		this->timestamp_ = std::chrono::time_point<std::chrono::high_resolution_clock>(
 			std::chrono::nanoseconds(msg->timestamp));
 		});
 
 	this->vehicle_odometry_sub_ = this->px4_node_->create_subscription<px4_msgs::msg::VehicleOdometry>(
 		vehicle_id_prefix + "/fmu/out/vehicle_odometry",
-		qos_profile,
+		px4_qos,
 		[this](px4_msgs::msg::VehicleOdometry::ConstSharedPtr msg) {
+			this->total_message_count_++;
 			this->odom_timestamp_ = std::chrono::time_point<std::chrono::high_resolution_clock>(
 				std::chrono::nanoseconds(msg->timestamp));
 			this->ground_speed_ = std::sqrt(
@@ -243,98 +254,314 @@ Drone::Drone() {
 
 	this->vehicle_airspeed_sub_ = this->px4_node_->create_subscription<px4_msgs::msg::Airspeed>(
 		vehicle_id_prefix + "/fmu/out/airspeed",
-		qos_profile,
+		px4_qos,
 		[this](px4_msgs::msg::Airspeed::ConstSharedPtr msg) {
+			this->total_message_count_++;
 			this->airspeed_ = msg->true_airspeed_m_s;
 		}
 	);
 
 	this->vehicle_rates_setpoint_pub_ = this->px4_node_->create_publisher<px4_msgs::msg::VehicleRatesSetpoint>(
-		vehicle_id_prefix + "/fmu/in/vehicle_rates_setpoint", qos_profile);
+		vehicle_id_prefix + "/fmu/in/vehicle_rates_setpoint", px4_qos);
 
 	this->vehicle_command_pub_ = this->px4_node_->create_publisher<px4_msgs::msg::VehicleCommand>(
-		vehicle_id_prefix + "/fmu/in/vehicle_command", qos_profile);
+		vehicle_id_prefix + "/fmu/in/vehicle_command", px4_qos);
 
 	this->vehicle_trajectory_setpoint_pub_ = this->px4_node_->create_publisher<px4_msgs::msg::TrajectorySetpoint>(
-		vehicle_id_prefix + "/fmu/in/trajectory_setpoint", qos_profile);
+		vehicle_id_prefix + "/fmu/in/trajectory_setpoint", px4_qos);
 
 	this->vehicle_offboard_control_mode_pub_ = this->px4_node_->create_publisher<px4_msgs::msg::OffboardControlMode>(
-		vehicle_id_prefix + "/fmu/in/offboard_control_mode", qos_profile);
+		vehicle_id_prefix + "/fmu/in/offboard_control_mode", px4_qos);
 
-	this->vertical_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
-		"/vertical_camera",
-		qos_profile,
-		[this](sensor_msgs::msg::Image::SharedPtr msg) {
-			vertical_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
-		}
-	);
-
-	this->horizontal_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
-		"/horizontal_camera",
-		qos_profile,
-		[this](sensor_msgs::msg::Image::SharedPtr msg) {
-			horizontal_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
-		}
-	);
-
-	this->classification_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
-		"/vertical_classification",
-		qos_profile,
-		[this](vision_msgs::msg::Detection2DArray::SharedPtr msg){
-			detections_.clear();
-			for (const auto &detection : msg->detections) {
-				bbox_center_x_ = detection.bbox.center.position.x;
-				bbox_center_y_ = detection.bbox.center.position.y;
-				bbox_size_x_ = detection.bbox.size_x;
-				bbox_size_y_ = detection.bbox.size_y;
-				detections_.push_back({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_});
+	// Camera subscriptions - disabled by default for performance optimization
+	// These can be enabled on-demand using enableCameraSubscriptions()
+	if (subscription_state_.vertical_camera_active) {
+		this->vertical_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
+			"/vertical_camera",
+			camera_qos,
+			[this](sensor_msgs::msg::Image::SharedPtr msg) {
+				this->total_message_count_++;
+				vertical_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
 			}
-		}
-	);
+		);
+	}
 
-	this->gesture_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::Gesture>(
-		"/gesture/classification",
-		qos_profile,
-		[this](custom_msgs::msg::Gesture::SharedPtr msg) {
-			this->gestures_ = msg->gestures;
-		}
-	);
-
-	this->hand_location_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::HandLocation>(
-		"/gesture/hand_location",
-		qos_profile,
-		[this](custom_msgs::msg::HandLocation::SharedPtr msg) {
-			this->hand_location_x_ = msg->hand_x;
-			this->hand_location_y_ = msg->hand_y;
-		}
-	);
-
-
-	this->bar_code_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::MultiBarCode>(
-		"/barcode/bounding_boxes",
-		qos_profile,
-		[this](const custom_msgs::msg::MultiBarCode::SharedPtr msg) {
-			barcode_detections_.clear();
-			
-			for (const auto &detection : msg->barcodes) {
-				// Access the bounding box information in each BarCode message
-				float bbox_center_x_ = detection.center_x;
-				float bbox_center_y_ = detection.center_y;
-				float bbox_size_x_ = detection.width;
-				float bbox_size_y_ = detection.height;
-
-				// Store the values in detections_ or process as needed
-				barcode_detections_.push_back(Eigen::Vector4d({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_}));
+	if (subscription_state_.horizontal_camera_active) {
+		this->horizontal_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
+			"/horizontal_camera",
+			camera_qos,
+			[this](sensor_msgs::msg::Image::SharedPtr msg) {
+				this->total_message_count_++;
+				horizontal_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
 			}
-		}
-	);
+		);
+	}
 
-	this->qr_code_sub_ = this->px4_node_->create_subscription<std_msgs::msg::String>(
-		"/qr_code_string",
-		qos_profile,
-		[this](std_msgs::msg::String::SharedPtr msg) {
-			this->qr_code_data_ = msg->data;
-	});
+	if (subscription_state_.angled_camera_active) {
+		this->angled_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
+			"/angled_camera",
+			camera_qos,
+			[this](sensor_msgs::msg::Image::SharedPtr msg) {
+				this->total_message_count_++;
+				angled_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
+			}
+		);
+	}
+	
+	// Computer vision subscriptions - active by default since used by FSM
+	if (subscription_state_.vertical_cv_active) {
+		this->vertical_classification_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+			"/vertical_camera/classification",
+			cv_qos,
+			[this](vision_msgs::msg::Detection2DArray::SharedPtr msg){
+				this->total_message_count_++;
+				vertical_detections_.clear();
+				for (const auto &detection : msg->detections) {
+					bbox_center_x_ = detection.bbox.center.position.x;
+					bbox_center_y_ = detection.bbox.center.position.y;
+					bbox_size_x_ = detection.bbox.size_x;
+					bbox_size_y_ = detection.bbox.size_y;
+					bbox_class_id_ = detection.results[0].hypothesis.class_id;
+					double confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+					vertical_detections_.push_back({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_, confidence, bbox_class_id_});
+				}
+			}
+		);
+	}
+
+	if (subscription_state_.angled_cv_active) {
+		this->angled_classification_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+			"/angled_camera/classification",
+			cv_qos,
+			[this](vision_msgs::msg::Detection2DArray::SharedPtr msg){
+				this->total_message_count_++;
+				angled_detections_.clear();
+				for (const auto &detection : msg->detections) {
+					bbox_center_x_ = detection.bbox.center.position.x;
+					bbox_center_y_ = detection.bbox.center.position.y;
+					bbox_size_x_ = detection.bbox.size_x;
+					bbox_size_y_ = detection.bbox.size_y;
+					double confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+					std::string class_id = detection.results.empty() ? "-1" : detection.results[0].hypothesis.class_id;
+					angled_detections_.push_back({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_, confidence, class_id});
+				}
+			}
+		);
+	}
+
+	// Post detection subscription - active by default for slalom mission
+	if (subscription_state_.post_detections_active) {
+		this->post_detection_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+			"/slalom",
+			cv_qos,
+			[this](vision_msgs::msg::Detection2DArray::SharedPtr msg){
+				this->total_message_count_++;
+				post_detections_.clear();
+				for (const auto &detection : msg->detections) {
+					bbox_center_x_ = detection.bbox.center.position.x;
+					bbox_center_y_ = detection.bbox.center.position.y;
+					bbox_size_x_ = detection.bbox.size_x;
+					bbox_size_y_ = detection.bbox.size_y;
+					bbox_class_id_ = detection.results[0].hypothesis.class_id;
+					double confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+					post_detections_.push_back({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_, confidence, bbox_class_id_});
+				}
+			}
+		);
+	}
+
+	// Custom message subscriptions - active by default since used by FSM
+	if (subscription_state_.gestures_active) {
+		this->gesture_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::Gesture>(
+			"/gesture/classification",
+			custom_qos,
+			[this](custom_msgs::msg::Gesture::SharedPtr msg) {
+				this->total_message_count_++;
+				this->gestures_ = msg->gestures;
+			}
+		);
+	}
+
+	if (subscription_state_.hand_location_active) {
+		this->hand_location_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::HandLocation>(
+			"/gesture/hand_location",
+			custom_qos,
+			[this](custom_msgs::msg::HandLocation::SharedPtr msg) {
+				this->total_message_count_++;
+				this->hand_location_x_ = msg->hand_x;
+				this->hand_location_y_ = msg->hand_y;
+			}
+		);
+	}
+
+	if (subscription_state_.barcodes_active) {
+		this->bar_code_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::MultiBarCode>(
+			"/barcode/bounding_boxes",
+			custom_qos,
+			[this](const custom_msgs::msg::MultiBarCode::SharedPtr msg) {
+				this->total_message_count_++;
+				barcode_detections_.clear();
+				
+				for (const auto &detection : msg->barcodes) {
+					// Access the bounding box information in each BarCode message
+					float bbox_center_x_ = detection.center_x;
+					float bbox_center_y_ = detection.center_y;
+					float bbox_size_x_ = detection.width;
+					float bbox_size_y_ = detection.height;
+
+					// Store the values in barcode_detections_ or process as needed
+					barcode_detections_.push_back(Eigen::Vector4d({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_}));
+				}
+			}
+		);
+	}
+
+	if (subscription_state_.qr_codes_active) {
+		this->qr_code_sub_ = this->px4_node_->create_subscription<std_msgs::msg::String>(
+			"/qr_code_string",
+			custom_qos,
+			[this](std_msgs::msg::String::SharedPtr msg) {
+				this->total_message_count_++;
+				this->qr_code_data_ = msg->data;
+		});
+	}
+
+	// Line and hose detection subscriptions for Fase2
+	if (subscription_state_.line_detection_active) {
+		// Subscribe to line centroid
+		this->line_centroid_sub_ = this->px4_node_->create_subscription<geometry_msgs::msg::PointStamped>(
+			"/blueline/centroid",
+			custom_qos,
+			[this](geometry_msgs::msg::PointStamped::SharedPtr msg) {
+				this->total_message_count_++;
+				this->line_detection_data_.has_detection = true;
+				this->line_detection_data_.centroid_x = msg->point.x;
+				this->line_detection_data_.centroid_y = msg->point.y;
+				this->line_detection_data_.confidence = msg->point.z;  // Confidence in z field
+				this->line_detection_data_.last_update = std::chrono::steady_clock::now();
+			}
+		);
+		
+		// Subscribe to line direction
+		this->line_direction_sub_ = this->px4_node_->create_subscription<geometry_msgs::msg::Vector3Stamped>(
+			"/blueline/direction",
+			custom_qos,
+			[this](geometry_msgs::msg::Vector3Stamped::SharedPtr msg) {
+				this->total_message_count_++;
+				this->line_detection_data_.direction_angle = msg->vector.z; // Angle in radians stored in z
+			}
+		);
+	}
+
+	if (subscription_state_.hose_detection_active) {
+		this->hose_detection_sub_ = this->px4_node_->create_subscription<geometry_msgs::msg::PointStamped>(
+			"/mangueira/position",
+			custom_qos,
+			[this](geometry_msgs::msg::PointStamped::SharedPtr msg) {
+				this->total_message_count_++;
+				this->hose_detection_data_.has_detection = true;
+				this->hose_detection_data_.position_x = msg->point.x;
+				this->hose_detection_data_.position_y = msg->point.y;
+				this->hose_detection_data_.confidence = msg->point.z;  // Confidence in z field
+				this->hose_detection_data_.last_update = std::chrono::steady_clock::now();
+			}
+		);
+	}
+	
+	// SAE 2025 Phase 2 enhanced subscriptions
+	if (subscription_state_.mangueira_detections_active) {
+		this->mangueira_detections_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+			"/mangueira/detections",
+			cv_qos,
+			[this](vision_msgs::msg::Detection2DArray::SharedPtr msg) {
+				this->total_message_count_++;
+				this->mangueira_detections_.clear();
+				for (const auto& detection : msg->detections) {
+					DronePX4::BoundingBox bbox;
+					bbox.center_x = detection.bbox.center.position.x;
+					bbox.center_y = detection.bbox.center.position.y;
+					bbox.size_x = detection.bbox.size_x;
+					bbox.size_y = detection.bbox.size_y;
+					bbox.confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+					bbox.class_id = detection.id;
+					this->mangueira_detections_.push_back(bbox);
+				}
+				this->mangueira_detections_last_update_ = std::chrono::steady_clock::now();
+			}
+		);
+	}
+	
+	if (subscription_state_.mangueira_angle_active) {
+		this->mangueira_angle_sub_ = this->px4_node_->create_subscription<std_msgs::msg::Float64>(
+			"/mangueira/angle",
+			custom_qos,
+			[this](std_msgs::msg::Float64::SharedPtr msg) {
+				this->total_message_count_++;
+				this->mangueira_angle_ = msg->data;
+				this->mangueira_angle_last_update_ = std::chrono::steady_clock::now();
+			}
+		);
+	}
+	
+	if (subscription_state_.blue_detections_active) {
+		this->blue_detections_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+			"/blue_base/detections",
+			cv_qos,
+			[this](vision_msgs::msg::Detection2DArray::SharedPtr msg) {
+				this->total_message_count_++;
+				this->blue_detections_.clear();
+				for (const auto& detection : msg->detections) {
+					DronePX4::BoundingBox bbox;
+					bbox.center_x = detection.bbox.center.position.x;
+					bbox.center_y = detection.bbox.center.position.y;
+					bbox.size_x = detection.bbox.size_x;
+					bbox.size_y = detection.bbox.size_y;
+					bbox.confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+					bbox.class_id = detection.id;
+					this->blue_detections_.push_back(bbox);
+				}
+				this->blue_detections_last_update_ = std::chrono::steady_clock::now();
+			}
+		);
+	}
+
+	this->position_pub_ = this->px4_node_->create_publisher<custom_msgs::msg::Position>(
+		"/position", custom_qos);
+
+	// Critical 20Hz position timer for FSM coordination - always active
+	this->position_timer_ = this->px4_node_->create_wall_timer(
+		std::chrono::milliseconds(50),  // 20 Hz - optimized timing
+		[this]() {
+			custom_msgs::msg::Position msg;
+
+			// NED coordinates
+			msg.x_ned = this->current_pos_x_;
+			msg.y_ned = this->current_pos_y_;
+			msg.z_ned = this->current_pos_z_;
+			msg.yaw_ned = this->yaw_;
+
+			msg.vx_ned = this->current_vel_x_;
+			msg.vy_ned = this->current_vel_y_;
+			msg.vz_ned = this->current_vel_z_;
+
+			// FRD coordinates
+			const Eigen::Vector3d positionNED(this->current_pos_x_, this->current_pos_y_, this->current_pos_z_);
+			const Eigen::Vector3d positionFRD = this->convertPositionNEDtoFRD(positionNED);
+
+			msg.x_frd = positionFRD.x();
+			msg.y_frd = positionFRD.y();
+			msg.z_frd = positionFRD.z();
+			msg.yaw_frd = this->yaw_ - this->initial_yaw_;
+
+			const Eigen::Vector3d velocityNED(this->current_vel_x_, this->current_vel_y_, this->current_vel_z_);
+			const Eigen::Vector3d velocityFRD = this->convertVelocityNEDtoFRD(velocityNED);
+
+			msg.vx_frd = velocityFRD.x();
+			msg.vy_frd = velocityFRD.y();
+			msg.vz_frd = velocityFRD.z();
+
+			this->position_pub_->publish(msg);
+		});
 
 }
 
@@ -402,7 +629,7 @@ Eigen::Vector3d Drone::getOrientation() {
 	return Eigen::Vector3d({
 		this->roll_,
 		this->pitch_,
-		this->yaw_
+		this->yaw_-initial_yaw_
 	});
 }
 
@@ -496,6 +723,7 @@ void Drone::setLocalPosition(float x, float y, float z, float yaw) {
 
 	const Eigen::Vector3d positionFRD(x, y, z);
 	const Eigen::Vector3d positionNED = this->convertPositionFRDtoNED(positionFRD);
+	yaw += initial_yaw_;
 
 	msg.position[0] = positionNED.x();
 	msg.position[1] = positionNED.y();
@@ -579,6 +807,27 @@ void Drone::setAirSpeed(float speed) {
   	this->setSpeed(speed, false);
 }
 
+void Drone::dropGancho() {
+	// Send MAV_CMD_DO_DIGICAM_CONTROL command to trigger payload release
+	// This is a common way to trigger auxiliary actions in PX4
+	this->sendCommand(
+		px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_DIGICAM_CONTROL,
+		this->target_system_,
+		this->target_component_,
+		this->source_system_,
+		this->source_component_,
+		this->confirmation_,
+		this->from_external_,
+		1.0f,  // Session control - trigger
+		0.0f,  // Zoom position
+		0.0f,  // Zoom step
+		0.0f,  // Focus lock
+		0.0f,  // Shooting command
+		0.0f,  // Command identity
+		0.0f   // Extra parameter
+	);
+}
+
 void Drone::setOffboardControlMode(DronePX4::CONTROLLER_TYPE type) {
 	px4_msgs::msg::OffboardControlMode msg;
 	msg.timestamp = this->px4_node_->get_clock()->now().nanoseconds() / 1000;
@@ -652,17 +901,7 @@ void Drone::setHomePosition(const Eigen::Vector3d& fictual_home) {
 	this->frd_home_position_ = fictual_home;
 	this->ned_home_position_ = Eigen::Vector3d({current_pos_x_, current_pos_y_, current_pos_z_});
 	this->initial_yaw_ = yaw_;
-
-	this->sendCommand(
-		px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_HOME,
-		this->target_system_,
-		this->target_component_,
-		this->source_system_,
-		this->source_component_,
-		this->confirmation_,
-		this->from_external_,
-		1.0f
-	);
+	this->log("INITIAL YAW IS: " + std::to_string(yaw_));
 }
 
 void Drone::sendCommand(
@@ -728,7 +967,10 @@ cv_bridge::CvImagePtr& Drone::getHorizontalImage() {
 
 cv_bridge::CvImagePtr& Drone::getVerticalImage() {
 	return vertical_cv_ptr_;
+}
 
+cv_bridge::CvImagePtr& Drone::getAngledImage() {
+	return angled_cv_ptr_;
 }
 
 void Drone::create_image_publisher(const std::string& topic_name) {
@@ -767,8 +1009,16 @@ std::unordered_map<std::string, std::string> Drone::encoding_map_ = {
 	{"CV_32FC3", "32FC3"}	
 };
 
-std::vector<DronePX4::BoundingBox> Drone::getBoundingBox(){
-	return detections_;
+std::vector<DronePX4::BoundingBox> Drone::getVerticalBboxes(){
+	return vertical_detections_;
+}
+
+std::vector<DronePX4::BoundingBox> Drone::getAngledBboxes(){
+	return angled_detections_;
+}
+
+std::vector<DronePX4::BoundingBox> Drone::getPostDetections(){
+	return post_detections_;
 }
 
 std::vector<Eigen::Vector4d> Drone::getBarCodeLocation() {
@@ -793,6 +1043,60 @@ void Drone::resetHands() {
 
 std::string Drone::readQRCode(){
 	return qr_code_data_;
+}
+
+// Line and hose detection interface methods for Fase2
+Drone::LineDetectionData Drone::getLineDetection() {
+	return line_detection_data_;
+}
+
+Drone::HoseDetectionData Drone::getHoseDetection() {
+	return hose_detection_data_;
+}
+
+bool Drone::isLineDetectionRecent(double timeout_seconds) {
+	if (!line_detection_data_.has_detection) {
+		return false;
+	}
+	
+	auto current_time = std::chrono::steady_clock::now();
+	auto time_since_detection = std::chrono::duration_cast<std::chrono::milliseconds>(
+		current_time - line_detection_data_.last_update).count();
+	
+	return time_since_detection < (timeout_seconds * 1000.0);
+}
+
+bool Drone::isHoseDetectionRecent(double timeout_seconds) {
+	if (!hose_detection_data_.has_detection) {
+		return false;
+	}
+	
+	auto current_time = std::chrono::steady_clock::now();
+	auto time_since_detection = std::chrono::duration_cast<std::chrono::milliseconds>(
+		current_time - hose_detection_data_.last_update).count();
+	
+	return time_since_detection < (timeout_seconds * 1000.0);
+}
+
+// SAE 2025 Phase 2 enhanced interface methods
+std::vector<DronePX4::BoundingBox> Drone::getMangueiraDetections() {
+	return mangueira_detections_;
+}
+
+double Drone::getMangueiraAngle() {
+	return mangueira_angle_;
+}
+
+bool Drone::isMangueiraAngleRecent(double timeout_seconds) {
+	auto current_time = std::chrono::steady_clock::now();
+	auto time_since_update = std::chrono::duration_cast<std::chrono::milliseconds>(
+		current_time - mangueira_angle_last_update_).count();
+	
+	return time_since_update < (timeout_seconds * 1000.0);
+}
+
+std::vector<DronePX4::BoundingBox> Drone::getBlueDetections() {
+	return blue_detections_;
 }
 
 //Coordinate System transformations (private functions)
@@ -846,4 +1150,349 @@ Eigen::Vector3d Drone::convertVelocityFRDtoNED(const Eigen::Vector3d& velocity_f
                 0, 0, 1;
 
     return rotation * velocity_frd;
+}
+
+/*
+    Subscription Management Implementation for Performance Optimization
+*/
+
+// Static method to get optimized QoS profiles for different subscription types
+rclcpp::QoS Drone::getOptimizedQoS(const std::string& subscription_type) {
+    if (subscription_type == "px4") {
+        // PX4 messages: Reliable, small queue for critical flight data
+        rclcpp::QoS qos(5);
+        qos.best_effort();
+        qos.durability(rclcpp::DurabilityPolicy::TransientLocal);
+        return qos;
+    }
+    else if (subscription_type == "camera") {
+        // Camera images: Best effort, very small queue for latest frame only
+        rclcpp::QoS qos(1);
+        qos.best_effort();
+        qos.durability(rclcpp::DurabilityPolicy::Volatile);
+        qos.history(rclcpp::HistoryPolicy::KeepLast);
+        return qos;
+    }
+    else if (subscription_type == "computer_vision") {
+        // CV results: Best effort, small queue for low latency
+        rclcpp::QoS qos(3);
+        qos.best_effort();
+        qos.durability(rclcpp::DurabilityPolicy::Volatile);
+        return qos;
+    }
+    else if (subscription_type == "custom") {
+        // Custom messages: Best effort, moderate queue
+        rclcpp::QoS qos(5);
+        qos.best_effort();
+        qos.durability(rclcpp::DurabilityPolicy::Volatile);
+        return qos;
+    }
+    else {
+        // Default: Best effort with moderate queue
+        rclcpp::QoS qos(10);
+        qos.best_effort();
+        return qos;
+    }
+}
+
+// Enable/disable camera subscriptions
+void Drone::enableCameraSubscriptions(bool vertical, bool horizontal, bool angled) {
+    auto camera_qos = getOptimizedQoS("camera");
+    
+    if (vertical && !subscription_state_.vertical_camera_active) {
+        subscription_state_.vertical_camera_active = true;
+        this->vertical_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
+            "/vertical_camera",
+            camera_qos,
+            [this](sensor_msgs::msg::Image::SharedPtr msg) {
+                this->total_message_count_++;
+                vertical_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
+            }
+        );
+    }
+    
+    if (horizontal && !subscription_state_.horizontal_camera_active) {
+        subscription_state_.horizontal_camera_active = true;
+        this->horizontal_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
+            "/horizontal_camera",
+            camera_qos,
+            [this](sensor_msgs::msg::Image::SharedPtr msg) {
+                this->total_message_count_++;
+                horizontal_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
+            }
+        );
+    }
+    
+    if (angled && !subscription_state_.angled_camera_active) {
+        subscription_state_.angled_camera_active = true;
+        this->angled_camera_sub_ = this->px4_node_->create_subscription<sensor_msgs::msg::Image>(
+            "/angled_camera",
+            camera_qos,
+            [this](sensor_msgs::msg::Image::SharedPtr msg) {
+                this->total_message_count_++;
+                angled_cv_ptr_ = cv_bridge::toCvCopy(msg, msg->encoding);
+            }
+        );
+    }
+}
+
+void Drone::disableCameraSubscriptions() {
+    if (subscription_state_.vertical_camera_active) {
+        subscription_state_.vertical_camera_active = false;
+        this->vertical_camera_sub_.reset();
+    }
+    
+    if (subscription_state_.horizontal_camera_active) {
+        subscription_state_.horizontal_camera_active = false;
+        this->horizontal_camera_sub_.reset();
+    }
+    
+    if (subscription_state_.angled_camera_active) {
+        subscription_state_.angled_camera_active = false;
+        this->angled_camera_sub_.reset();
+    }
+}
+
+// Enable/disable computer vision subscriptions
+void Drone::enableComputerVisionSubscriptions(bool vertical, bool angled) {
+    auto cv_qos = getOptimizedQoS("computer_vision");
+    
+    if (vertical && !subscription_state_.vertical_cv_active) {
+        subscription_state_.vertical_cv_active = true;
+        this->vertical_classification_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+            "/vertical_camera/classification",
+            cv_qos,
+            [this](vision_msgs::msg::Detection2DArray::SharedPtr msg){
+                this->total_message_count_++;
+                vertical_detections_.clear();
+                for (const auto &detection : msg->detections) {
+                    bbox_center_x_ = detection.bbox.center.position.x;
+                    bbox_center_y_ = detection.bbox.center.position.y;
+                    bbox_size_x_ = detection.bbox.size_x;
+                    bbox_size_y_ = detection.bbox.size_y;
+                    bbox_class_id_ = detection.results[0].hypothesis.class_id;
+                    double confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+                    vertical_detections_.push_back({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_, confidence, bbox_class_id_});
+                }
+            }
+        );
+    }
+    
+    if (angled && !subscription_state_.angled_cv_active) {
+        subscription_state_.angled_cv_active = true;
+        this->angled_classification_sub_ = this->px4_node_->create_subscription<vision_msgs::msg::Detection2DArray>(
+            "/angled_camera/classification",
+            cv_qos,
+            [this](vision_msgs::msg::Detection2DArray::SharedPtr msg){
+                this->total_message_count_++;
+                angled_detections_.clear();
+                for (const auto &detection : msg->detections) {
+                    bbox_center_x_ = detection.bbox.center.position.x;
+                    bbox_center_y_ = detection.bbox.center.position.y;
+                    bbox_size_x_ = detection.bbox.size_x;
+                    bbox_size_y_ = detection.bbox.size_y;
+                    double confidence = detection.results.empty() ? 0.0 : detection.results[0].hypothesis.score;
+                    std::string class_id = detection.results.empty() ? "-1" : detection.results[0].hypothesis.class_id;
+                    angled_detections_.push_back({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_, confidence, class_id});
+                }
+            }
+        );
+    }
+}
+
+void Drone::disableComputerVisionSubscriptions() {
+    if (subscription_state_.vertical_cv_active) {
+        subscription_state_.vertical_cv_active = false;
+        this->vertical_classification_sub_.reset();
+    }
+    
+    if (subscription_state_.angled_cv_active) {
+        subscription_state_.angled_cv_active = false;
+        this->angled_classification_sub_.reset();
+    }
+}
+
+// Enable/disable custom message subscriptions
+void Drone::enableCustomMessageSubscriptions(bool gestures, bool hand_location, bool barcodes, bool qr_codes) {
+    auto custom_qos = getOptimizedQoS("custom");
+    
+    if (gestures && !subscription_state_.gestures_active) {
+        subscription_state_.gestures_active = true;
+        this->gesture_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::Gesture>(
+            "/gesture/classification",
+            custom_qos,
+            [this](custom_msgs::msg::Gesture::SharedPtr msg) {
+                this->total_message_count_++;
+                this->gestures_ = msg->gestures;
+            }
+        );
+    }
+    
+    if (hand_location && !subscription_state_.hand_location_active) {
+        subscription_state_.hand_location_active = true;
+        this->hand_location_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::HandLocation>(
+            "/gesture/hand_location",
+            custom_qos,
+            [this](custom_msgs::msg::HandLocation::SharedPtr msg) {
+                this->total_message_count_++;
+                this->hand_location_x_ = msg->hand_x;
+                this->hand_location_y_ = msg->hand_y;
+            }
+        );
+    }
+    
+    if (barcodes && !subscription_state_.barcodes_active) {
+        subscription_state_.barcodes_active = true;
+        this->bar_code_sub_ = this->px4_node_->create_subscription<custom_msgs::msg::MultiBarCode>(
+            "/barcode/bounding_boxes",
+            custom_qos,
+            [this](const custom_msgs::msg::MultiBarCode::SharedPtr msg) {
+                this->total_message_count_++;
+                barcode_detections_.clear();
+                
+                for (const auto &detection : msg->barcodes) {
+                    float bbox_center_x_ = detection.center_x;
+                    float bbox_center_y_ = detection.center_y;
+                    float bbox_size_x_ = detection.width;
+                    float bbox_size_y_ = detection.height;
+                    barcode_detections_.push_back(Eigen::Vector4d({bbox_center_x_, bbox_center_y_, bbox_size_x_, bbox_size_y_}));
+                }
+            }
+        );
+    }
+    
+    if (qr_codes && !subscription_state_.qr_codes_active) {
+        subscription_state_.qr_codes_active = true;
+        this->qr_code_sub_ = this->px4_node_->create_subscription<std_msgs::msg::String>(
+            "/qr_code_string",
+            custom_qos,
+            [this](std_msgs::msg::String::SharedPtr msg) {
+                this->total_message_count_++;
+                this->qr_code_data_ = msg->data;
+            }
+        );
+    }
+}
+
+void Drone::disableCustomMessageSubscriptions() {
+    if (subscription_state_.gestures_active) {
+        subscription_state_.gestures_active = false;
+        this->gesture_sub_.reset();
+    }
+    
+    if (subscription_state_.hand_location_active) {
+        subscription_state_.hand_location_active = false;
+        this->hand_location_sub_.reset();
+    }
+    
+    if (subscription_state_.barcodes_active) {
+        subscription_state_.barcodes_active = false;
+        this->bar_code_sub_.reset();
+    }
+    
+    if (subscription_state_.qr_codes_active) {
+        subscription_state_.qr_codes_active = false;
+        this->qr_code_sub_.reset();
+    }
+    
+    if (subscription_state_.line_detection_active) {
+        subscription_state_.line_detection_active = false;
+        this->line_centroid_sub_.reset();
+        this->line_direction_sub_.reset();
+    }
+    
+    if (subscription_state_.hose_detection_active) {
+        subscription_state_.hose_detection_active = false;
+        this->hose_detection_sub_.reset();
+    }
+    
+    if (subscription_state_.mangueira_detections_active) {
+        subscription_state_.mangueira_detections_active = false;
+        this->mangueira_detections_sub_.reset();
+    }
+    
+    if (subscription_state_.mangueira_angle_active) {
+        subscription_state_.mangueira_angle_active = false;
+        this->mangueira_angle_sub_.reset();
+    }
+    
+    if (subscription_state_.blue_detections_active) {
+        subscription_state_.blue_detections_active = false;
+        this->blue_detections_sub_.reset();
+    }
+}
+
+// Check subscription status
+bool Drone::isCameraSubscriptionActive(const std::string& camera_type) const {
+    if (camera_type == "vertical") return subscription_state_.vertical_camera_active;
+    if (camera_type == "horizontal") return subscription_state_.horizontal_camera_active;
+    if (camera_type == "angled") return subscription_state_.angled_camera_active;
+    return false;
+}
+
+bool Drone::isComputerVisionSubscriptionActive(const std::string& cv_type) const {
+    if (cv_type == "vertical") return subscription_state_.vertical_cv_active;
+    if (cv_type == "angled") return subscription_state_.angled_cv_active;
+    return false;
+}
+
+bool Drone::isCustomMessageSubscriptionActive(const std::string& msg_type) const {
+    if (msg_type == "gestures") return subscription_state_.gestures_active;
+    if (msg_type == "hand_location") return subscription_state_.hand_location_active;
+    if (msg_type == "barcodes") return subscription_state_.barcodes_active;
+    if (msg_type == "qr_codes") return subscription_state_.qr_codes_active;
+    return false;
+}
+
+// Performance monitoring
+void Drone::printSubscriptionStats(){
+	auto now = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - last_stats_print_);
+	double secs = static_cast<double>(duration.count());
+
+	if (secs >= 5.0) {  // Print stats every 5 seconds
+		double rate = total_message_count_ / std::max(1.0, secs);
+
+		this->log("=== Drone Subscription Performance Stats ===");
+		this->log("Active subscriptions: " + std::to_string(getActiveSubscriptionCount()));
+		this->log("Total messages processed: " + std::to_string(total_message_count_));
+		this->log("Message rate: " + std::to_string(rate) + " msg/sec");
+		this->log("Subscription Status:");
+		this->log("  PX4 subscriptions: ALWAYS ACTIVE (critical)");
+		this->log(std::string("  Vertical camera: ") + (subscription_state_.vertical_camera_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Horizontal camera: ") + (subscription_state_.horizontal_camera_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Angled camera: ") + (subscription_state_.angled_camera_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Vertical CV: ") + (subscription_state_.vertical_cv_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Angled CV: ") + (subscription_state_.angled_cv_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Gestures: ") + (subscription_state_.gestures_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Hand location: ") + (subscription_state_.hand_location_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Barcodes: ") + (subscription_state_.barcodes_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  QR codes: ") + (subscription_state_.qr_codes_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Line detection: ") + (subscription_state_.line_detection_active ? "ACTIVE" : "DISABLED"));
+		this->log(std::string("  Hose detection: ") + (subscription_state_.hose_detection_active ? "ACTIVE" : "DISABLED"));
+		this->log("  Position timer: ALWAYS ACTIVE (20Hz FSM)");
+		this->log("============================================");
+
+		last_stats_print_ = now;
+		total_message_count_ = 0;  // reset counter if desired
+	}
+}
+
+size_t Drone::getActiveSubscriptionCount() const {
+    size_t count = 4;  // Always active: vehicle_status, timesync, odometry, airspeed
+    
+    if (subscription_state_.vertical_camera_active) count++;
+    if (subscription_state_.horizontal_camera_active) count++;
+    if (subscription_state_.angled_camera_active) count++;
+    if (subscription_state_.vertical_cv_active) count++;
+    if (subscription_state_.angled_cv_active) count++;
+    if (subscription_state_.post_detections_active) count++;
+    if (subscription_state_.gestures_active) count++;
+    if (subscription_state_.hand_location_active) count++;
+    if (subscription_state_.barcodes_active) count++;
+    if (subscription_state_.qr_codes_active) count++;
+    if (subscription_state_.line_detection_active) count += 2; // centroid + direction
+    if (subscription_state_.hose_detection_active) count++;
+    
+    return count;
 }

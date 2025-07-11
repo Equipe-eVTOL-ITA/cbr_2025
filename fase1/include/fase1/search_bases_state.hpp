@@ -41,7 +41,7 @@ public:
         goal = goal_diff + pos;
         drone->setLocalPosition(goal[0], goal[1], goal[2], initial_yaw);
 
-        bboxes = drone->getBoundingBox();
+        // bboxes = drone->getBoundingBox();
 
         if (!bboxes.empty() && !previous_bboxes.empty()) {
             if (bboxes[0].center_x != previous_bboxes[0].center_x){

@@ -53,7 +53,7 @@ public:
             return "GOT QR CODE";
         }
 
-        bboxes = drone->getBoundingBox();
+        // bboxes = drone->getBoundingBox();
 
         // Find the bounding box closest to the center
         double min_distance = std::numeric_limits<double>::max();
