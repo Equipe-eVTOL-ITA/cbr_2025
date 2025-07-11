@@ -1,136 +1,211 @@
-#include "fase1/initial_takeoff_state.hpp"
-#include "fase1/landing_state.hpp"
-#include "fase1/return_home_state.hpp"
-#include "fase1/search_bases_state.hpp"
-#include "fase1/takeoff_state.hpp"
-#include "fase1/visit_bases_state.hpp"
-#include "fase1/CoordinateTransforms.hpp"
-#include "fase1/Base.hpp"
-#include "fase1/ArenaPoint.hpp"
-#include <rclcpp/rclcpp.hpp>
-
-
 #include <memory>
 #include <iostream>
+#include <vector>
 
+#include "drone/Drone.hpp"
+#include "fsm/fsm.hpp"
+#include <rclcpp/rclcpp.hpp>
+
+// imports dos estados
+#include "fase1/initial_takeoff_state.hpp"
+#include "fase1/search_base_state.hpp"
+#include "fase1/goto_base_state.hpp"
+#include "fase1/precision_align_state.hpp"
+#include "fase1/landing_state.hpp"
 
 class Fase1FSM : public fsm::FSM {
 public:
-    Fase1FSM() : fsm::FSM({"ERROR", "FINISHED"}) {
+    Fase1FSM(
+        float takeoff_height, float max_vertical_velocity, float max_horizontal_velocity,
+        float max_search_time,
+        float pid_pos_kp, float pid_pos_ki, float pid_pos_kd,
+        float setpoint,
+        std::string class_id,
+        float position_tolerance,
+        float reso_x, float reso_y,
+        float square_side_length
+    ) : fsm::FSM({"ERROR", "FINISHED"}){
+        
+        Drone* drone = new Drone();
+        
+        this->blackboard_set<Drone>("drone", drone);
 
-        this->blackboard_set<Drone>("drone", new Drone());
-        Drone* drone = blackboard_get<Drone>("drone");
-
-        const Eigen::Vector3d fictual_home = Eigen::Vector3d({1.2, -1.0, -0.6});
-        drone->setHomePosition(fictual_home);
-
-        std::vector<Base> bases;
-        const Eigen::Vector3d home_pos = drone->getLocalPosition(); 
         const Eigen::Vector3d orientation = drone->getOrientation();
 
-        bases.push_back({home_pos, true});
-        this->blackboard_set<std::vector<Base>>("bases", bases);
-        this->blackboard_set<Eigen::Vector3d>("home_position", home_pos);
-        this->blackboard_set<bool>("finished_bases", false);
-        this->blackboard_set<float>("initial_yaw", orientation[2]);
+        std::vector<Base> bases;
+        bases.push_back({drone->getLocalPosition(), true});
 
-        // ARENA POINTS
-        std::vector<ArenaPoint> waypoints;
-        float takeoff_height = -3.5;
-        waypoints.push_back({Eigen::Vector3d({1.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({3.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({3.0, -1.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({5.0, -1.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({5.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({6.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({6.0, -1.0, takeoff_height})});
-        this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
+        // Parametros principais
         this->blackboard_set<float>("takeoff_height", takeoff_height);
+        this->blackboard_set<float>("max_vertical_velocity", max_vertical_velocity);
+        this->blackboard_set<float>("max_horizontal_velocity", max_horizontal_velocity);
+        this->blackboard_set<float>("initial_yaw", orientation[2]);
+        this->blackboard_set<float>("resolution_x", reso_x);
+        this->blackboard_set<float>("resolution_y", reso_y);
+    
+        // Parametros da missao
+        this->blackboard_set<float>("max_search_time", max_search_time);
+        this->blackboard_set<std::string>("class_id", class_id);
+        this->blackboard_set<float>("square_side_length", square_side_length);
+        this->blackboard_set<float>("position_tolerance", position_tolerance);
+        this->blackboard_set<std::vector<Base>>("bases", bases);
+        this->blackboard_set<bool>("finished_bases", false);
+        this->blackboard_set<float>("setpoint", setpoint);
 
-        // COORDINATE TRANSFORMS
-        float fx = 640.0f;
-        float fy = 480.0f;
-        float cx = 320.0f;
-        float cy = 240.0f;
-        float k1 = 0.0f, k2 = 0.0f, k3 = 0.0f, p1 = 0.0f, p2 = 0.0f;
-        float ground_z = -1.0;
+        // Pontos da Aerena
+        /*
+        E---A---B
+        |       |
+        |       |
+        D-------C
+        */
+        std::vector<ArenaPoint> waypoints;
+        float l2 = square_side_length/2.0;
+        waypoints.push_back({
+            Eigen::Vector3d({l2, 0, takeoff_height}) // A
+        });
+        waypoints.push_back({
+            Eigen::Vector3d({l2, l2, takeoff_height}) // B
+        });
+        waypoints.push_back({
+            Eigen::Vector3d({-l2, l2, takeoff_height}) // C
+        });
+        waypoints.push_back({
+            Eigen::Vector3d({-l2, -l2, takeoff_height}) // D
+        });
+        waypoints.push_back({
+            Eigen::Vector3d({l2, -l2, takeoff_height}) // E
+        });
+        this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
 
-        // Camera intrinsic matrix K
-        cv::Mat camera_matrix = (cv::Mat_<double>(3, 3) <<
-            fx, 0, cx,
-            0, fy, cy,
-            0,  0,  1);
+        // Parametos do PID da posicao
+        this->blackboard_set<float>("pid_pos_kp", pid_pos_kp);
+        this->blackboard_set<float>("pid_pos_ki", pid_pos_ki);
+        this->blackboard_set<float>("pid_pos_kd", pid_pos_kd);
 
-        // Distortion coefficients
-        cv::Mat dist_coeffs = (cv::Mat_<double>(1, 5) <<
-            k1, k2, p1, p2, k3);
-
-        // Camera mounting parameters
-        Eigen::Vector3d t_dc(0, 0, 0.2);
-        Eigen::Matrix3d R_dc = Eigen::Matrix3d::Identity();
-
-        CoordinateTransforms* coord_transforms = new CoordinateTransforms(
-            t_dc, R_dc, camera_matrix, dist_coeffs, ground_z, orientation[2]);
-
-        this->blackboard_set<CoordinateTransforms>("coordinate_transforms", coord_transforms);
-
+        // Estados
         this->add_state("INITIAL TAKEOFF", std::make_unique<InitialTakeoffState>());
-        this->add_state("SEARCH BASES", std::make_unique<SearchBasesState>());
-        this->add_state("VISIT BASE", std::make_unique<VisitBasesState>());
-        this->add_state("LANDING", std::make_unique<LandingState>());
-        this->add_state("TAKEOFF", std::make_unique<TakeoffState>());
-        this->add_state("RETURN HOME", std::make_unique<ReturnHomeState>());
+        this->add_state("SEARCH BASE", std::make_unique<SearchBaseState>());
+        this->add_state("GO TO BASE", std::make_unique<GoToBaseState>());
+        this->add_state("PRECISION ALIGN", std::make_unique<PrecisionAlignState>());
+        this->add_state("PRECISION LANDING", std::make_unique<LandingState>());
 
-        // Initial Takeoff transitions
-        this->add_transitions("INITIAL TAKEOFF", {{"INITIAL TAKEOFF COMPLETED", "SEARCH BASES"},{"SEG FAULT", "ERROR"}});
+        // Definicao das transicoes
+        /*
+        Funcionam como grafos:
+            no inicial, {condicao para a transicao, no final}
+        */
+        this->add_transitions("INITIAL TAKEOFF", {
+            {"INITIAL TAKEOFF COMPLETED", "SEARCH BASE"},
+            {"SEG FAULT", "ERROR"}
+        });
 
-        // Search Bases transitions
-        this->add_transitions("SEARCH BASES", {{"BASES FOUND", "VISIT BASE"},{"SEG FAULT", "ERROR"}});
-        this->add_transitions("SEARCH BASES", {{"SEARCH ENDED", "RETURN HOME"},{"SEG FAULT", "ERROR"}});
+        this->add_transitions("SEARCH BASE", {
+            {"BASE FOUND", "GO TO BASE"},
+            {"SEG FAULT", "ERROR"}
+        });
 
-        // Visit Base transitions
-        this->add_transitions("VISIT BASE", {{"ARRIVED AT BASE", "LANDING"},{"SEG FAULT", "ERROR"}});
-        this->add_transitions("VISIT BASE", {{"LOST BASE", "SEARCH BASES"}, {"SEG FAULT", "ERROR"}});
+        this->add_transitions("GO TO BASE", {
+            {"OVER THE BASE", "PRECISION ALIGN"},
+            {"SEG FAULT", "ERROR"}
+        });
 
-        // Landing transitions
-        this->add_transitions("LANDING", {{"LANDED", "TAKEOFF"},{"SEG FAULT", "ERROR"}});
+        this->add_transitions("PRECISION ALIGN", {
+            {"PRECISELY ALIGNED", "PRECISION LANDING"},
+            {"SEG FAULT", "ERROR"}
+        });
 
-        // Takeoff transitions
-        this->add_transitions("TAKEOFF", {{"NEXT BASE", "SEARCH BASES"},{"SEG FAULT", "ERROR"}});
-        this->add_transitions("TAKEOFF", {{"FINISHED BASES", "RETURN HOME"},{"SEG FAULT", "ERROR"}});
-
-        // Return Home transitions
-        this->add_transitions("RETURN HOME", {{"AT HOME", "FINISHED"},{"SEG FAULT", "ERROR"}});
-        
+        this->add_transitions("PRECISION LANDING", {
+            {"LANDED", "FINISHED"},
+            {"SEG FAULT", "ERROR"}
+        });
     }
+
 };
+
 
 class NodeFSM : public rclcpp::Node {
 public:
-    NodeFSM() : rclcpp::Node("fase1_node"), my_fsm() {
+    NodeFSM() : rclcpp::Node("fase3_fsm") {
+        // Parametros principais
+        this->declare_parameter("takeoff_height", -2.0);
+        this->declare_parameter("max_vertical_velocity", 1.5);
+        this->declare_parameter("max_horizontal_velocity", 1.0);
+        this->declare_parameter("resolution_x", 800.0);
+        this->declare_parameter("resolution_y", 800.0);
+        this->declare_parameter("square_side_length", 2.0);
+
+        // Parametros da missao
+        this->declare_parameter("max_search_time", 30.0);
+        this->declare_parameter("class_id", "estrela");
+        this->declare_parameter("position_tolerance", 0.08);
+
+        // Parametros do PID
+        this->declare_parameter("pid_pos_kp", 0.9);
+        this->declare_parameter("pid_pos_ki", 0.0);
+        this->declare_parameter("pid_pos_kd", 0.05);
+        this->declare_parameter("setpoint", 0.5);
+
+        // Obtendo os valores dos parametros...
+
+        // ... principais
+        float takeoff_height = this->get_parameter("takeoff_height").as_double();
+        float max_vertical_velocity = this->get_parameter("max_vertical_velocity").as_double();
+        float max_horizontal_velocity = this->get_parameter("max_horizontal_velocity").as_double();
+        float reso_x = this->get_parameter("resolution_x").as_double();
+        float reso_y = this->get_parameter("resolution_y").as_double();
+
+        // ... da missao
+        float max_search_time = this->get_parameter("max_search_time").as_double();
+        std::string class_id = this->get_parameter("class_id").as_string();
+        float square_side_length = this->get_parameter("square_side_length").as_double();
+        
+        // ... do PID
+        float pid_pos_kp = this->get_parameter("pid_pos_kp").as_double();
+        float pid_pos_ki = this->get_parameter("pid_pos_ki").as_double();
+        float pid_pos_kd = this->get_parameter("pid_pos_kd").as_double();
+        float setpoint = this->get_parameter("setpoint").as_double();
+        float position_tolerance = this->get_parameter("position_tolerance").as_double();
+
+        // Inicializando um ponteiro inteligente para uma instancia do Finite State Machine
+        b_fsm = std::make_unique<Fase1FSM>(
+            takeoff_height, max_vertical_velocity, max_horizontal_velocity, max_search_time,
+            pid_pos_kp, pid_pos_ki, pid_pos_kd,
+            setpoint,
+            class_id,
+            position_tolerance,
+            reso_x, reso_y,
+            square_side_length
+        );
+
+        // Wall timer para executar tarefas com base na passagem do tempo real
+        // Garante que as acoes baseadas em tempo sejam consistentes e previsiveis
         timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(50),  // Run at approximately 20 Hz
-            std::bind(&NodeFSM::executeFSM, this));
+            std::chrono::milliseconds(50), // Faz rodar em aproximadamente 20 Hz
+            std::bind(&NodeFSM::executeFSM, this) // seta um callback para o timer do ROS2 para ser chamado periodicamente
+        );
+
     }
 
     void executeFSM() {
-        if (rclcpp::ok() && !my_fsm.is_finished()) {
-            my_fsm.execute();
+        if (rclcpp::ok() && !b_fsm->is_finished()) {
+            b_fsm->execute();
         } else {
             rclcpp::shutdown();
         }
     }
 
 private:
-    Fase1FSM my_fsm;
-    rclcpp::TimerBase::SharedPtr timer_;
+    std::unique_ptr<Fase1FSM> b_fsm; // Declaracao do ponteiro inteligente para uma instancia do FSM
+    rclcpp::TimerBase::SharedPtr timer_; // Declaracao do wall timer para garantir boa passagem de tempo
 };
 
-int main(int argc, const char *argv[]) {
+
+int main(int argc, const char *argv[]){
     rclcpp::init(argc, argv);
 
-    auto my_node = std::make_shared<NodeFSM>();
-    rclcpp::spin(my_node);
+    auto node_bouncing = std::make_shared<NodeFSM>();
+    rclcpp::spin(node_bouncing);
 
     return 0;
 }

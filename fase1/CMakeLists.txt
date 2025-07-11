@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(cbr_2025_fase1)
+project(cbr_fase1)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -18,9 +18,9 @@ find_package(vision_msgs REQUIRED)
 include_directories(include)
 include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/../fsm/fsm/include)
 
-
-add_library(CoordinateTransforms src/CoordinateTransforms.cpp)
+#fase1
 
 add_executable(fase1
   src/fase1.cpp
@@ -34,25 +34,19 @@ ament_target_dependencies(fase1
   vision_msgs
 )
 
-target_link_libraries(fase1 CoordinateTransforms ${OpenCV_LIBS})
+target_link_libraries(fase1 ${OpenCV_LIBS})
 
-add_executable(fase1_dummy
-  src/fase1_dummy.cpp
-)
-
-ament_target_dependencies(fase1_dummy
-  rclcpp
-  fsm
-  cbr_drone_lib
-  Eigen3
-  vision_msgs
-)
+#Install
 
 install(
   TARGETS
     fase1
-    fase1_dummy
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install launch files
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 if(BUILD_TESTING)

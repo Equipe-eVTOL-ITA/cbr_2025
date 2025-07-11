@@ -1,7 +1,6 @@
 #include <Eigen/Eigen>
 #include "fsm/fsm.hpp"
 #include "drone/Drone.hpp"
-#include "Base.hpp"
 #include <chrono>
 
 class LandingState : public fsm::State {
@@ -11,7 +10,7 @@ public:
     void on_enter(fsm::Blackboard &blackboard) override {
         drone = blackboard.get<Drone>("drone");
         if (drone == nullptr) return;
-        drone->log("STATE: LANDING");
+        drone->log("STATE: Pousando...");
 
         pos = drone->getLocalPosition();
 
@@ -35,22 +34,11 @@ public:
 
     void on_exit(fsm::Blackboard &blackboard) override {
         //Publish base coordinates
+        (void) blackboard;
         pos = drone->getLocalPosition();
-        std::vector<Base> bases = *blackboard.get<std::vector<Base>>("bases");
-        bases.push_back({pos, true});
-        blackboard.set<std::vector<Base>>("bases", bases);
 
-        drone->log("New base {" + std::to_string(bases.size()) + "}: " +
-                    std::to_string(pos.x()) + ", " + std::to_string(pos.y()) + ", " + std::to_string(pos.z()));
-
-        if (bases.size() > 5){
-            blackboard.set<bool>("finished_bases", true);
-            drone->log("Visited all 6 bases");
-        }
-
-        drone->log("Offboard and arming.");
-        drone->toOffboardSync();
-        drone->armSync();    
+        drone->log("Disarming.");
+        drone->disarmSync();
     }
 
 private:
