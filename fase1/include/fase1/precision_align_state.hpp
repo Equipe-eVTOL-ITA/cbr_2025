@@ -7,15 +7,15 @@
 #include "fsm/fsm.hpp"
 #include "drone/Drone.hpp"
 #include "PidController.hpp"
-#include "Detection.hpp"
 
 class PrecisionAlignState : public fsm::State {
 public:
-    PrecisionAlignState() : fsm::State(), drone(nullptr), x_pid(0,0,0,0), y_pid(0,0,0,0) {}
+    PrecisionAlignState() : fsm::State(), drone(nullptr), vision(nullptr), x_pid(0,0,0,0), y_pid(0,0,0,0) {}
 
     void on_enter(fsm::Blackboard &blackboard){
-        this->drone = blackboard.get<Drone>("drone");
-        if(!this->drone) return;
+        this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
+        this->vision = *blackboard.get<std::shared_ptr<VisionNode>>("vision");
+        if(!this->drone || !this->vision) return;
         this->drone->log("STATE: Alinhando com a base no chao...");
 
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
@@ -29,18 +29,19 @@ public:
     }
 
     std::string act(fsm::Blackboard &blackboard) override {
-        (void)blackboard;
+        std::string class_id = *blackboard.get<std::string>("class_id");
 
         float x_rate = 0.0, y_rate = 0.0;
         float vertical_distance = 1.0;
 
         float yaw = drone->getOrientation()[2];
 
-        Detection verticalDetection(drone->getVerticalBboxes());
+        // Usar VisionNode em vez da classe Detection
+        auto detection_result = vision->getClosestDetection("vertical", class_id);
 
-        if (verticalDetection.isThereDetection()){
-            DronePX4::BoundingBox vertical_bbox = verticalDetection.getClosestBbox();
-            vertical_distance = verticalDetection.getMinDistance();
+        if (detection_result.has_detection){
+            BoundingBox vertical_bbox = detection_result.closest_bbox;
+            vertical_distance = detection_result.min_distance;
 
             x_rate = x_pid.compute(-vertical_bbox.center_y);
             y_rate = y_pid.compute(vertical_bbox.center_x);
@@ -57,7 +58,8 @@ public:
     }
 
 private:
-    Drone* drone;
+    std::shared_ptr<Drone> drone;
+    std::shared_ptr<VisionNode> vision;
     PidController x_pid, y_pid;
     float kp, ki, kd;
     float setpoint;

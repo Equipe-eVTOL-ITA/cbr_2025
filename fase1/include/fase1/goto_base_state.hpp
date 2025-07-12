@@ -8,7 +8,7 @@ public:
     GoToBaseState() : fsm::State() {}
 
     void on_enter(fsm::Blackboard &blackboard) override {
-        this->drone = blackboard.get<Drone>("drone");
+        this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if(this->drone == nullptr) return;
         this->drone->log("STATE: Voando para a base ja detectada...");
 
@@ -65,5 +65,5 @@ private:
     float yaw;
     float position_tolerance;
 
-    Drone* drone;
+    std::shared_ptr<Drone> drone;
 };

@@ -13,7 +13,6 @@ find_package(px4_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(vision_msgs REQUIRED)
 find_package(custom_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -46,7 +45,6 @@ ament_target_dependencies(cbr_drone_lib
   rclcpp
   tf2
   cv_bridge
-  vision_msgs
   custom_msgs
 )
 
@@ -63,7 +61,7 @@ ament_target_dependencies(pos_to_rviz
 
 ament_export_targets(cbr_drone_lib HAS_LIBRARY_TARGET)
 
-ament_export_dependencies(Eigen3 px4_msgs rclcpp tf2 cv_bridge vision_msgs custom_msgs)
+ament_export_dependencies(Eigen3 px4_msgs rclcpp tf2 cv_bridge custom_msgs)
  
 # install the include/my_cpp_library directory to the install/include/my_cpp_library
 install(

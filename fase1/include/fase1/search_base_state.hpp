@@ -13,8 +13,9 @@ public:
     // A ideia do Blackboard eh criar um canal de troca de informacoes entre os estados, que estao isolados pela FSM
     void on_enter(fsm::Blackboard &blackboard) override {
         
-        this->drone = blackboard.get<Drone>("drone"); // obtendo o ponteiro para o objeto drone
-        if(this->drone == nullptr) return;
+        this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
+        this->vision = *blackboard.get<std::shared_ptr<VisionNode>>("vision");
+        if(this->drone == nullptr || this->vision == nullptr) return;
         drone->log("STATE: Procurando bases...");
 
         this->initial_yaw = *blackboard.get<float>("initial_yaw");
@@ -53,12 +54,16 @@ public:
             this->initial_yaw
         );
 
-        auto bboxes = drone->getVerticalBboxes();
+        auto bboxes = vision->getVerticalDetections();
         if (!bboxes.empty()) {
-            int temp_counter = 0;
             for (const auto& bbox : bboxes) {
                 if (bbox.class_id == this->class_id) {
                     this->drone->log("Base " + this->class_id + " encontrada.");
+                    
+                    // Calcular posição estimada no solo baseado na detecção
+                    Eigen::Vector2d estimated_base_position(this->pos.x(), this->pos.y());
+                    blackboard.set<Eigen::Vector2d>("estimated_base_position_on_ground", estimated_base_position);
+                    
                     return "BASE FOUND";
                 }
             }
@@ -74,9 +79,10 @@ public:
     }
 
 private:
-    Drone* drone;
+    std::shared_ptr<Drone> drone;
+    std::shared_ptr<VisionNode> vision;
     std::vector<Base>* bases;
-    std::vector<DronePX4::BoundingBox> bboxes, previous_bboxes;
+    std::vector<BoundingBox> bboxes, previous_bboxes;
     std::vector<ArenaPoint>* waypoints;
     ArenaPoint* goal_point;
     Eigen::Vector3d pos, goal, goal_diff;

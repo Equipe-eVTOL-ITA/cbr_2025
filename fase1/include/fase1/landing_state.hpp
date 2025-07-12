@@ -8,7 +8,7 @@ public:
     LandingState() : fsm::State() {}
 
     void on_enter(fsm::Blackboard &blackboard) override {
-        drone = blackboard.get<Drone>("drone");
+        drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if (drone == nullptr) return;
         drone->log("STATE: Pousando...");
 
@@ -42,7 +42,7 @@ public:
     }
 
 private:
-    Drone* drone;
+    std::shared_ptr<Drone> drone;
     Eigen::Vector3d pos;
     std::chrono::steady_clock::time_point start_time_;
 };
