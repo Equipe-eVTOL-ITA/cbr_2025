@@ -2,6 +2,8 @@
 #include <opencv2/highgui.hpp>
 #include "fsm/fsm.hpp"
 #include "drone/Drone.hpp"
+#include "vision_fase1.hpp"
+
 
 class GoToBaseState : public fsm::State {
 public:
@@ -10,44 +12,41 @@ public:
     void on_enter(fsm::Blackboard &blackboard) override {
         this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if(this->drone == nullptr) return;
-        this->drone->log("STATE: Voando para a base ja detectada...");
+        this->drone->log("STATE: GO TO BASE");
 
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
-        float takeoff_height = *blackboard.get<float>("takeoff_height");
-        
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
-        
-        // Lendo o que esta escrito no "Quadro negro" o que o search_base_state escreveu
-        // no caso, a estimativa da posicao da base no solo
-        const Eigen::Vector2d estimated_base_position = *blackboard.get<Eigen::Vector2d>("estimated_base_position_on_ground");
-        // como nao queremos ir direto ja pousando, o nosso goal eh o x e y dessa posicao estimada
-        // porem, a altura nao eh 0, mas sim a altura de takeoff. Entao:
-        this->goal = Eigen::Vector3d(
-            estimated_base_position.x(),
-            estimated_base_position.y(),
-            takeoff_height
-        );
+        this->takeoff_height = *blackboard.get<float>("takeoff_height");
 
-        yaw = this->drone->getOrientation()[2];
+        auto approx_base = *blackboard.get<Eigen::Vector2d>("approximate_base");
+        this->initial_yaw = this->drone->getOrientation()[2];
+
+        this->goal = Eigen::Vector3d(
+            approx_base.x(),
+            approx_base.y(),
+            this->takeoff_height
+        );
     }
 
 
     std::string act(fsm::Blackboard &blackboard) override {
         (void) blackboard;
-        this->pos = this->drone->getLocalPosition();
 
-        if((this->pos - this->goal).norm() < this->position_tolerance){
+        Eigen::Vector3d pos = this->drone->getLocalPosition();
+        Eigen::Vector3d diff = this->goal - pos;
+
+        if(diff.norm() < this->position_tolerance){
             return "OVER THE BASE";
         }
 
-        Eigen::Vector3d diff = this->goal - this->pos;
-        Eigen::Vector3d little_goal = this->pos + (diff.norm() > max_velocity ? diff.normalized() * max_velocity : diff);
+        Eigen::Vector3d little_goal = pos + (diff.norm() > this->max_velocity ?
+                                            diff.normalized() * this->max_velocity : diff);
 
         this->drone->setLocalPosition(
-            little_goal[0],
-            little_goal[1],
-            little_goal[2],
-            yaw
+            little_goal.x(),
+            little_goal.y(),
+            little_goal.z(),
+            this->initial_yaw
         );
 
         return "";        
@@ -58,12 +57,10 @@ public:
     }
 
 private:
-    Eigen::Vector3d pos;
-    Eigen::Vector3d goal;
-    
-    float max_velocity;
-    float yaw;
-    float position_tolerance;
-
     std::shared_ptr<Drone> drone;
+    float max_velocity;
+    float position_tolerance;
+    float takeoff_height;
+    float initial_yaw;
+    Eigen::Vector3d goal;
 };

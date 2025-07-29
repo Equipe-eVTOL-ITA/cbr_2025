@@ -1,23 +1,26 @@
 fase1_fsm:
   ros__parameters:
-    # Main parameters
+    fictual_home_x: 1.0
+    fictual_home_y: -0.75
+    fictual_home_z: 0.6
+
     takeoff_height: -2.5
     max_vertical_velocity: 2.0
     max_horizontal_velocity: 2.5
-    resolution_x: 800.0
-    resolution_y: 800.0
-    square_side_length: 3.5
-    
-    # Mission parameters
+
     max_search_time: 30.0
-    class_id: ""
     position_tolerance: 0.1
-    
-    # PID parameters
+
     pid_pos_kp: 0.9
     pid_pos_ki: 0.0
     pid_pos_kd: 0.05
     setpoint: 0.5
+
+    known_base_radius: 1.7
+    height_to_ground: 1.0
+    detection_timeout: 10.0
+    align_tolerance: 0.05
+    landing_timeout: 8.0
 
 fase3_color_detector:
   ros__parameters:

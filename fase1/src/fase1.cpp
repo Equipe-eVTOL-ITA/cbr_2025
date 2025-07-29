@@ -5,13 +5,16 @@
 #include "fsm/fsm.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include "drone/Drone.hpp"
-#include "vision_fase1.cpp"
+#include "fase1/vision_fase1.hpp"
 
 #include "fase1/initial_takeoff_state.hpp"
 #include "fase1/search_base_state.hpp"
 #include "fase1/goto_base_state.hpp"
 #include "fase1/precision_align_state.hpp"
 #include "fase1/landing_state.hpp"
+#include "fase1/return_home_state.hpp"
+#include "fase1/takeoff_state.hpp"
+
 
 class Fase1FSM : public fsm::FSM {
 public:
@@ -24,8 +27,7 @@ public:
         this->blackboard_set<std::shared_ptr<Drone>>("drone", drone);
         this->blackboard_set<std::shared_ptr<VisionNode>>("vision", vision);
 
-        const Eigen::Vector3d orientation = drone->getOrientation();
-        
+        // Parametros de ROS 2
         for (const auto& [key, value] : params) {
             if (std::holds_alternative<double>(value)) {
                 this->blackboard_set<float>(key, static_cast<float>(std::get<double>(value)));
@@ -34,49 +36,28 @@ public:
             }
         }
         
-        // Parâmetros especiais (não vindos do mapa)
-        std::vector<Base> bases;
-        bases.push_back({drone->getLocalPosition(), true});
         
-        this->blackboard_set<float>("initial_yaw", orientation[2]);
-        this->blackboard_set<std::vector<Base>>("bases", bases);
+        float takeoff_height = *this->blackboard_get<float>("takeoff_height");
+
+        std::vector<ArenaPoint> waypoints;
+        waypoints.push_back({Eigen::Vector3d({1.0, -7.0, takeoff_height})});
+        waypoints.push_back({Eigen::Vector3d({3.0, -7.0, takeoff_height})});
+        waypoints.push_back({Eigen::Vector3d({3.0, -1.0, takeoff_height})});
+        waypoints.push_back({Eigen::Vector3d({5.0, -1.0, takeoff_height})});
+        waypoints.push_back({Eigen::Vector3d({5.0, -7.0, takeoff_height})});
+        waypoints.push_back({Eigen::Vector3d({6.0, -7.0, takeoff_height})});
+        waypoints.push_back({Eigen::Vector3d({6.0, -1.0, takeoff_height})});
+        this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
         this->blackboard_set<bool>("finished_bases", false);
 
-        // Construir waypoints usando parâmetros já no blackboard
-        float square_side_length = std::get<double>(params.at("square_side_length"));
-        float takeoff_height = std::get<double>(params.at("takeoff_height"));
-        
-        // Pontos da Arena
-        /*
-        E---A---B
-        |       |
-        |       |
-        D-------C
-        */
-        std::vector<ArenaPoint> waypoints;
-        float l2 = square_side_length/2.0;
-        waypoints.push_back({
-            Eigen::Vector3d({l2, 0, takeoff_height}) // A
-        });
-        waypoints.push_back({
-            Eigen::Vector3d({l2, l2, takeoff_height}) // B
-        });
-        waypoints.push_back({
-            Eigen::Vector3d({-l2, l2, takeoff_height}) // C
-        });
-        waypoints.push_back({
-            Eigen::Vector3d({-l2, -l2, takeoff_height}) // D
-        });
-        waypoints.push_back({
-            Eigen::Vector3d({l2, -l2, takeoff_height}) // E
-        });
-        this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
 
         this->add_state("INITIAL TAKEOFF", std::make_unique<InitialTakeoffState>());
         this->add_state("SEARCH BASE", std::make_unique<SearchBaseState>());
         this->add_state("GO TO BASE", std::make_unique<GoToBaseState>());
         this->add_state("PRECISION ALIGN", std::make_unique<PrecisionAlignState>());
         this->add_state("PRECISION LANDING", std::make_unique<LandingState>());
+        this->add_state("RETURN HOME", std::make_unique<ReturnHomeState>());
+        this->add_state("TAKEOFF", std::make_unique<TakeoffState>());
 
         this->add_transitions("INITIAL TAKEOFF", {
             {"INITIAL TAKEOFF COMPLETED", "SEARCH BASE"},
@@ -85,6 +66,7 @@ public:
 
         this->add_transitions("SEARCH BASE", {
             {"BASE FOUND", "GO TO BASE"},
+            {"SEARCH ENDED", "RETURN HOME"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -95,11 +77,23 @@ public:
 
         this->add_transitions("PRECISION ALIGN", {
             {"PRECISELY ALIGNED", "PRECISION LANDING"},
+            {"LOST BASE", "SEARCH BASE"},
             {"SEG FAULT", "ERROR"}
         });
 
         this->add_transitions("PRECISION LANDING", {
-            {"LANDED", "FINISHED"},
+            {"LANDED", "TAKEOFF"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("TAKEOFF", {
+            {"NEXT BASE", "SEARCH BASE"},
+            {"FINISHED BASES", "RETURN HOME"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("RETURN HOME", {
+            {"AT HOME", "FINISHED"},
             {"SEG FAULT", "ERROR"}
         });
     }
@@ -114,21 +108,27 @@ public:
 
 
         std::map<std::string, std::variant<double, std::string>> default_params = {
+            {"fictual_home_x", 1.0},
+            {"fictual_home_y", -0.75},
+            {"fictual_home_z", 0.6},
+
             {"takeoff_height", -2.0},
             {"max_vertical_velocity", 1.5},
             {"max_horizontal_velocity", 1.0},
-            {"resolution_x", 800.0},
-            {"resolution_y", 800.0},
-            {"square_side_length", 2.0},
             
             {"max_search_time", 30.0},
-            {"class_id", std::string("estrela")},
             {"position_tolerance", 0.08},
             
             {"pid_pos_kp", 0.9},
             {"pid_pos_ki", 0.0},
             {"pid_pos_kd", 0.05},
-            {"setpoint", 0.5}
+            {"setpoint", 0.5},
+
+            {"known_base_radius", 1.7},
+            {"height_to_ground", 1.0},
+            {"detection_timeout", 10.0},
+            {"align_tolerance", 0.05},
+            {"landing_timeout", 8.0}
         };
         
         auto params = declareAndGetParameters(default_params);

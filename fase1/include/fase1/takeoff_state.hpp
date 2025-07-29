@@ -5,25 +5,15 @@
 #include "Base.hpp"
 #include "vision_fase1.hpp"
 
-
-class InitialTakeoffState : public fsm::State {
+class TakeoffState : public fsm::State {
 public:
-    InitialTakeoffState() : fsm::State() {}
+    TakeoffState() : fsm::State() {}
 
     void on_enter(fsm::Blackboard &blackboard) override {
 
         drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if (drone == nullptr) return;
-        drone->log("STATE: INITIAL TAKEOFF");
-
-        float home_x = *blackboard.get<float>("fictual_home_x");
-        float home_y = *blackboard.get<float>("fictual_home_y");
-        float home_z = *blackboard.get<float>("fictual_home_z");
-        const Eigen::Vector3d fictual_home = Eigen::Vector3d({home_x, home_y, home_z});
-        drone->toOffboardSync();
-        drone->armSync();
-        drone->setHomePosition(fictual_home);
-
+        drone->log("STATE: TAKEOFF");
 
         std::vector<Base> bases;
         bases.push_back({drone->getLocalPosition(), true});
@@ -39,10 +29,12 @@ public:
         this->pos = drone->getLocalPosition();
         this->initial_yaw = drone->getOrientation()[2];
         this->goal = Eigen::Vector3d({this->pos[0], this->pos[1], takeoff_height});
+        bool finished_bases = *blackboard.get<bool>("finished_bases");
 
+        this->return_statement = finished_bases ? "FINISHED BASES" : "NEXT BASE";
 
         drone->log("Initial Yaw: " + std::to_string(initial_yaw));
-        drone->log("Home at: " + std::to_string(pos[0])
+        drone->log("Takeoff at: " + std::to_string(pos[0])
                     + " " + std::to_string(pos[1]) + " " + std::to_string(pos[2]));
 
     }
@@ -56,12 +48,11 @@ public:
         }
         this->print_counter++;
         
-        
         this->pos = drone->getLocalPosition();
         Eigen::Vector3d diff = this->goal - this->pos;
 
         if (diff.norm() < this->position_tolerance) {
-            return "INITIAL TAKEOFF COMPLETED";
+            return "TAKEOFF COMPLETED";
         }
 
         Eigen::Vector3d little_goal = pos + (diff.norm() > max_velocity ?
@@ -83,4 +74,5 @@ private:
     int print_counter;
     float initial_yaw;
     float position_tolerance;
+    std::string return_statement;
 };
