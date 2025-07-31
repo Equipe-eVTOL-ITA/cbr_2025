@@ -17,7 +17,9 @@ setup(
         'console_scripts': [
             'yolo_classifier = yolo_classifier.yolo_classifier:main',
             'barcode = barcode_detector.oak_bar:main',
-            'qrcode = qrcode_detector.qrcode_detector:main'
+            'qrcode = qrcode_detector.qrcode_detector:main',
+            'base_detector = base_detector.base_detector:main',
+            'base_detector_v2 = base_detector.base_detector_v2:main'
         ],
     }
 )

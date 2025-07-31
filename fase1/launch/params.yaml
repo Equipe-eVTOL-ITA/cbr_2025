@@ -22,91 +22,116 @@ fase1_fsm:
     align_tolerance: 0.05
     landing_timeout: 8.0
 
-fase3_color_detector:
+
+base_detector_v2:
   ros__parameters:
-    # Detection parameters
-    image_topic: '/vertical_camera'
-    area_minima_bases: 300
+    # General parameters
+    image_topic: '/camera/image'
+    detection_topic: '/base_detector/detections'
+    mask_debug_topic: '/base_detector/mask_debug'
+    bbox_debug_topic: '/base_detector/bbox_debug'
+    enable_debug_output: true
     
-    # HSV ranges for fase3 objects
-    # Os valores podem ser ajustados posteriormente conforme calibração real
-    circulo:
-      hue_lower: 100
-      hue_upper: 130
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 120
-      value_upper: 255
+    # Morphological operations (color-specific)
+    yellow_morph_kernel_size: 3
+    yellow_morph_iterations: 2
+    blue_morph_kernel_size: 5
+    blue_morph_iterations: 3
+    
+    # HSV color ranges (same as base_detector)
+    blue_lower_h: 100
+    blue_lower_s: 80
+    blue_lower_v: 50
+    blue_upper_h: 130
+    blue_upper_s: 255
+    blue_upper_v: 255
+    
+    yellow_lower_h: 20
+    yellow_lower_s: 120
+    yellow_lower_v: 150
+    yellow_upper_h: 30
+    yellow_upper_s: 255
+    yellow_upper_v: 255
+    
+    # Detection constraints for combined regions
+    combined_min_area: 1000
+    combined_max_area: 50000
+    combined_aspect_ratio_min: 0.5
+    combined_aspect_ratio_max: 2.0
+    
+    # Dilation parameters for combining adjacent color regions
+    combination_kernel_size: 15
+    combination_iterations: 1
 
-    triangulo:
-      hue_lower: 100
-      hue_upper: 130
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 50
-      value_upper: 120
 
-    hexagono:
-      hue_lower: 0
-      hue_upper: 10
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 120
-      value_upper: 255
 
-    hexagono2:  # Para wrap-around do vermelho
-      hue_lower: 170
-      hue_upper: 180
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 120
-      value_upper: 255
+# Currently not working: base_detector (more complex version)
 
-    pentagono:
-      hue_lower: 0
-      hue_upper: 10
-      saturation_lower: 200
-      saturation_upper: 255
-      value_lower: 60
-      value_upper: 120
-
-    estrela:
-      hue_lower: 40
-      hue_upper: 80
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 50
-      value_upper: 255
-
-    cruz:
-      hue_lower: 140
-      hue_upper: 170
-      saturation_lower: 80
-      saturation_upper: 255
-      value_lower: 80
-      value_upper: 255
-
-    casa:
-      hue_lower: 10
-      hue_upper: 25
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 100
-      value_upper: 255
-
-    quadrado:
-      hue_lower: 0
-      hue_upper: 180
-      saturation_lower: 0
-      saturation_upper: 255
-      value_lower: 0
-      value_upper: 50
-
-    quadrado2:
-      hue_lower: 10
-      hue_upper: 30
-      saturation_lower: 100
-      saturation_upper: 255
-      value_lower: 30
-      value_upper: 120
-
+base_detector:
+  ros__parameters:
+    # General parameters
+    image_topic: '/vertical_camera'
+    detection_topic: '/vertical_camera/classification'
+    mask_debug_topic: '/base_detector/mask_debug'
+    bbox_debug_topic: '/base_detector/bbox_debug'
+    enable_debug_output: true
+    
+    # Detection constraints
+    confidence_threshold: 0.4
+    
+    # Morphological operations (color-specific)
+    yellow_morph_kernel_size: 1
+    yellow_morph_iterations: 3
+    blue_morph_kernel_size: 5
+    blue_morph_iterations: 3
+    
+    # HSV color ranges
+    blue_lower_h: 100
+    blue_lower_s: 80
+    blue_lower_v: 50
+    blue_upper_h: 130
+    blue_upper_s: 255
+    blue_upper_v: 255
+    
+    yellow_lower_h: 20
+    yellow_lower_s: 120
+    yellow_lower_v: 150
+    yellow_upper_h: 30
+    yellow_upper_s: 255
+    yellow_upper_v: 255
+    
+    # Cross detection parameters (0.5m arms - square cross)
+    cross_min_area: 200
+    cross_max_area: 500000
+    cross_aspect_ratio_min: 0.8
+    cross_aspect_ratio_max: 1.3
+    cross_line_thickness_ratio: 0.1  # Line thickness to total size ratio
+    cross_solidity_max: 0.8  # Cross should not be too solid (has concave parts)
+    
+    # Yellow circle detection parameters (0.8m diameter, 0.05m width)
+    yellow_circle_min_area: 300
+    yellow_circle_max_area: 800000
+    yellow_circle_circularity_min: 0.8
+    yellow_circle_aspect_ratio_max: 1.2
+    
+    # Blue circle detection parameters (0.7m diameter)
+    blue_circle_min_area: 500
+    blue_circle_max_area: 700000
+    blue_circle_circularity_min: 0.9
+    blue_circle_aspect_ratio_max: 1.4
+    
+    # Yellow square detection parameters (1.0m side, 0.05m width)
+    yellow_square_min_area: 400
+    yellow_square_max_area: 1000000
+    yellow_square_aspect_ratio_min: 0.8
+    yellow_square_aspect_ratio_max: 1.25
+    yellow_square_rectangularity_min: 0.7
+    
+    # Geometric relationship parameters
+    max_center_distance_ratio: 0.3
+    
+    # Weight parameters for final bounding box calculation
+    cross_weight: 0.6
+    yellow_circle_weight: 0.15
+    blue_circle_weight: 0.15
+    yellow_square_weight: 0.1

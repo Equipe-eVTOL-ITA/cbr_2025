@@ -1,0 +1,18 @@
+Base Detector Parameters
+==============================
+
+Blue HSV Range:
+  H: 100 - 130
+  S: 80 - 255
+  V: 50 - 255
+
+Yellow HSV Range:
+  H: 20 - 30
+  S: 120 - 255
+  V: 150 - 255
+
+Detection Constraints:
+Min Pad Area: 5000
+Max Pad Area: 50000
+Min Aspect Ratio: 0.7
+Max Aspect Ratio: 1.3

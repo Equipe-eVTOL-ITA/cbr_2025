@@ -20,6 +20,8 @@ public:
         float home_y = *blackboard.get<float>("fictual_home_y");
         float home_z = *blackboard.get<float>("fictual_home_z");
         const Eigen::Vector3d fictual_home = Eigen::Vector3d({home_x, home_y, home_z});
+        blackboard.set<Eigen::Vector3d>("home_position", fictual_home);
+        
         drone->toOffboardSync();
         drone->armSync();
         drone->setHomePosition(fictual_home);

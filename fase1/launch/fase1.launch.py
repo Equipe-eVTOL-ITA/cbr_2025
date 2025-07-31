@@ -17,8 +17,8 @@ def generate_launch_description():
         description="Executable that implements the mission FSM")
 
     detector_node = Node(
-        package='sae_cv_utils',
-        executable='fase3_color_detector',
+        package='cbr_cv_utils',
+        executable='base_detector_v2',
         parameters=[params]
     )
 
@@ -30,9 +30,17 @@ def generate_launch_description():
     )
 
     bridge_node = Node(
-        package='sae_drone_lib',
+        package='cbr_drone_lib',
         executable='pos_to_rviz',
         output='screen'
+    )
+
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', rviz_cfg]
     )
 
     delayed_fase1_node = TimerAction(period=5.0, actions=[fase1_node])
@@ -41,5 +49,6 @@ def generate_launch_description():
         exec_arg,
         detector_node,
         bridge_node,
+        rviz_node,
         delayed_fase1_node
     ])
