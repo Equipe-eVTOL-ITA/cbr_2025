@@ -169,6 +169,9 @@ class BaseDetectorV2(Node):
         try:
             # Convert ROS Image to OpenCV format
             cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+
+            # Store image dimensions for normalization
+            self.last_image_shape = cv_image.shape
             
             # Detect landing pads
             detections, mask_debug_image, bbox_debug_image = self.detect_landing_pads(cv_image)
@@ -346,17 +349,19 @@ class BaseDetectorV2(Node):
         """Create ROS 2 Detection2DArray message from detections"""
         detection_array = Detection2DArray()
         detection_array.header = header
+
+        img_height, img_width = self.last_image_shape[:2]
         
         for det in detections:
             detection = Detection2D()
             
-            # Set bounding box
+            # Set bounding box - NORMALIZE TO [0,1]
             x, y, w, h = det['bbox']
-            detection.bbox.center.position.x = float(x + w/2)
-            detection.bbox.center.position.y = float(y + h/2)
+            detection.bbox.center.position.x = float(x + w/2) / img_width
+            detection.bbox.center.position.y = float(y + h/2) / img_height
             detection.bbox.center.theta = 0.0
-            detection.bbox.size_x = float(w)
-            detection.bbox.size_y = float(h)
+            detection.bbox.size_x = float(w) / img_width
+            detection.bbox.size_y = float(h) / img_height     
             
             # Set hypothesis (no confidence score for now)
             hypothesis = ObjectHypothesisWithPose()

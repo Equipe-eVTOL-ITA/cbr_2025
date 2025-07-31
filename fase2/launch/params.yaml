@@ -1,4 +1,4 @@
-fase1_fsm:
+fase2_fsm:
   ros__parameters:
     fictual_home_x: 1.0
     fictual_home_y: -0.75
