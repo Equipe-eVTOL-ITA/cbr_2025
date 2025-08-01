@@ -12,6 +12,8 @@ public:
     void on_enter(fsm::Blackboard &blackboard) override {
         this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if(this->drone == nullptr) return;
+
+        this->drone->log("");
         this->drone->log("STATE: GO TO BASE");
 
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");

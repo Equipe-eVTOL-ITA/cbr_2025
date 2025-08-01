@@ -14,6 +14,8 @@ public:
 
         drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if (drone == nullptr) return;
+
+        this->drone->log("");
         drone->log("STATE: INITIAL TAKEOFF");
 
         float home_x = *blackboard.get<float>("fictual_home_x");
@@ -25,7 +27,6 @@ public:
         drone->toOffboardSync();
         drone->armSync();
         drone->setHomePosition(fictual_home);
-
 
         std::vector<Base> bases;
         bases.push_back({drone->getLocalPosition(), true});

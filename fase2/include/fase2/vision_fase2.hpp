@@ -63,7 +63,7 @@ public:
         );
 
         package_sub_ = this->create_subscription<vision_msgs::msg::Detection2D>(
-            '/package/classification',
+            "/package/classification",
             vision_qos,
             [this](const vision_msgs::msg::Detection2D::SharedPtr msg) {
                 this->package_last_update_ = std::chrono::steady_clock::now();
@@ -79,10 +79,12 @@ public:
 
                 this->package_detection_ = bbox;
             }
-        )
+        );
         
         RCLCPP_INFO(this->get_logger(), "Vision node initialized successfully");
     }
+
+    // BASE GETTERS ------------------------------------------------------------------------
 
     double lastDetectionTime() {
         auto now = std::chrono::steady_clock::now();
@@ -103,7 +105,7 @@ public:
     }
 
     bool isThereDetection(){
-        if (this->lastDetectionTime() > this->timeout_)
+        if (this->lastDetectionTime() > this->timeout_.count())
             return false;
 
         return this->is_there_detection_;
@@ -113,7 +115,10 @@ public:
         return this->detections_;
     }
 
+    // -------------------------------------------------------------------------------------
 
+
+    // PACKAGE GETTERS ---------------------------------------------------------------------
 
     double lastPackageTime(){
         auto now = std::chrono::steady_clock::now();
@@ -125,9 +130,10 @@ public:
     }
 
     bool isTherePackage(){
-        return this->lastPackageTime() < this->timeout_? true : false;
+        return this->lastPackageTime() < this->timeout_.count() ? true : false;
     }
 
+    // -------------------------------------------------------------------------------------
 
 private:
     rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detections_sub_;

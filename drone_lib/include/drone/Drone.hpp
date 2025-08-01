@@ -224,13 +224,13 @@ private:
 
 	float current_speed;
 	std::chrono::time_point<std::chrono::high_resolution_clock> odom_timestamp_;
-	float current_pos_x_;
-	float current_pos_y_;
-	float current_pos_z_;
-	float current_vel_x_;
-	float current_vel_y_;
-	float current_vel_z_;
-	float ground_speed_;
+	float current_pos_x_{0};
+	float current_pos_y_{0};
+	float current_pos_z_{0};
+	float current_vel_x_{0};
+	float current_vel_y_{0};
+	float current_vel_z_{0};
+	float ground_speed_{0};
 	float airspeed_{0};
 
 	uint8_t target_component_{1};

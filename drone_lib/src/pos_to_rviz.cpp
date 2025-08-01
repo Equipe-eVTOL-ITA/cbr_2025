@@ -38,11 +38,12 @@ public:
         pose.header.stamp = t;
         pose.header.frame_id = "map";
 
-        pose.pose.position.x = in.x_frd;
-        pose.pose.position.y = in.y_frd;
+        pose.pose.position.x = in.y_frd;
+        pose.pose.position.y = in.x_frd;
         pose.pose.position.z = -in.z_frd;
 
-        double half = in.yaw_frd * 0.5;
+        double yaw_enu = in.yaw_frd + 3.14159265358979323846/2;
+        double half = yaw_enu * 0.5;
         pose.pose.orientation.w = std::cos(half);
         pose.pose.orientation.x = 0.0;
         pose.pose.orientation.y = 0.0;
@@ -56,8 +57,8 @@ public:
 
         geometry_msgs::msg::TwistStamped twist;
         twist.header = pose.header;
-        twist.twist.linear.x = in.vx_frd;
-        twist.twist.linear.y = in.vy_frd;
+        twist.twist.linear.x = in.vy_frd;
+        twist.twist.linear.y = in.vx_frd;
         twist.twist.linear.z = -in.vz_frd;
         twist_pub_->publish(twist);
       });

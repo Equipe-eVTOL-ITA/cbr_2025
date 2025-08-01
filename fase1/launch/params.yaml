@@ -2,25 +2,28 @@ fase1_fsm:
   ros__parameters:
     fictual_home_x: 1.0
     fictual_home_y: -0.75
-    fictual_home_z: 0.6
+    fictual_home_z: -0.6 # Remember z points Down
 
     takeoff_height: -3.0
     max_vertical_velocity: 1.2
     max_horizontal_velocity: 1.0
 
     max_search_time: 30.0
-    position_tolerance: 0.1
+    position_tolerance: 0.07
 
-    pid_pos_kp: 0.01
-    pid_pos_ki: 0.0005
-    pid_pos_kd: 0.001
+    pid_pos_kp: 1.0
+    pid_pos_ki: 0.01
+    pid_pos_kd: 0.05
     setpoint: 0.0
 
     known_base_radius: 1.7
     height_to_ground: 1.2
+    # Use positive values for these heights
+    mean_base_height: 0.85
     detection_timeout: 10.0
-    align_tolerance: 0.05
-    landing_timeout: 8.0
+    # -------------------------------------
+    align_tolerance: 0.025
+    landing_timeout: 7.0
 
 
 base_detector_v2:
@@ -41,21 +44,21 @@ base_detector_v2:
     # HSV color ranges (same as base_detector)
     blue_lower_h: 100
     blue_lower_s: 80
-    blue_lower_v: 50
+    blue_lower_v: 40
     blue_upper_h: 130
     blue_upper_s: 255
     blue_upper_v: 255
     
     yellow_lower_h: 20
     yellow_lower_s: 120
-    yellow_lower_v: 150
+    yellow_lower_v: 70
     yellow_upper_h: 30
     yellow_upper_s: 255
     yellow_upper_v: 255
     
     # Detection constraints for combined regions
     combined_min_area: 1000
-    combined_max_area: 50000
+    combined_max_area: 500000
     combined_aspect_ratio_min: 0.5
     combined_aspect_ratio_max: 2.0
     

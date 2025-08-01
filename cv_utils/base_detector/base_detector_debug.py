@@ -48,8 +48,8 @@ class BaseDetectorDebug:
             with open(params_file, 'r') as f:
                 yaml_data = yaml.safe_load(f)
                 
-            if 'base_detector' in yaml_data and 'ros__parameters' in yaml_data['base_detector']:
-                detector_params = yaml_data['base_detector']['ros__parameters']
+            if 'base_detector_v2' in yaml_data and 'ros__parameters' in yaml_data['base_detector_v2']:
+                detector_params = yaml_data['base_detector_v2']['ros__parameters']
                 
                 # Update parameters
                 for key, value in detector_params.items():

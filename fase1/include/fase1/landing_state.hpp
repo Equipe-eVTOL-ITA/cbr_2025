@@ -12,6 +12,8 @@ public:
     void on_enter(fsm::Blackboard &blackboard) override {
         this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if (this->drone == nullptr) return;
+
+        this->drone->log("");
         this->drone->log("STATE: LANDING");
 
 
@@ -44,7 +46,7 @@ public:
         drone->log("New base {" + std::to_string(bases->size()) + "}: " +
                     std::to_string(pos.x()) + ", " + std::to_string(pos.y()) + ", " + std::to_string(pos.z()));
 
-        if (bases->size() > 5){
+        if (bases->size() == 7){
             blackboard.set<bool>("finished_bases", true);
             drone->log("Visited all 6 bases");
         }

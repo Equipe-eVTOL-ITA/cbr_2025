@@ -126,6 +126,7 @@ public:
 
             {"known_base_radius", 1.7},
             {"height_to_ground", 1.0},
+            {"mean_base_height", 0.75},
             {"detection_timeout", 10.0},
             {"align_tolerance", 0.05},
             {"landing_timeout", 8.0}
