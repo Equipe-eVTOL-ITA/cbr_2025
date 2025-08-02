@@ -40,8 +40,8 @@ public:
         this->no_detection_counter = 0;
         this->approx_offset = Eigen::Vector2d::Zero();
 
-        this->detected = 0;
-        this->undetected = 0;
+        this->total_detected = 0;
+        this->total_undetected = 0;
 
 
         this->x_pid = PidController(this->kp, this->ki, this->kd, this->setpoint);
@@ -56,11 +56,9 @@ public:
         this->yaw = this->drone->getOrientation()[2];
         
         if (this->print_counter % 5 == 0 ){
-            float detection_ratio = this->detected / (this->detected + this->undetected);
             this->drone->log("");
             this->drone->log("yaw=" + std::to_string(this->yaw));
-            this->drone->log("Detected: " + std::to_string(this->detected) + ", Undetected: " + std::to_string(this->undetected));
-            this->drone->log("Detection ratio: " + std::to_string(detection_ratio));
+            this->drone->log("Detected: " + std::to_string(this->total_detected) + ", Undetected: " + std::to_string(this->total_undetected));
         }
 
         if (this->vision->lastBaseDetectionTime() > this->detection_timeout){
@@ -70,11 +68,16 @@ public:
 
         
         if (this->vision->isThereDetection()) {
-            this->detected++;
+            this->total_detected++;
             
             this->no_detection_counter = 0;
             auto bbox = this->vision->getClosestBbox();
             this->approx_offset = this->getApproximateOffset(bbox);
+
+            auto approx_base = this->pos.head<2>() + this->approx_offset;
+            this->vision->publishEstimatedBase(approx_base,
+                                                "estimate_" + std::to_string(this->print_counter),
+                                                -this->mean_base_height);
 
             if (this->approx_offset.norm() < this->align_tolerance){
                 return "PRECISELY ALIGNED";
@@ -82,7 +85,7 @@ public:
 
         }
         else {
-            this->undetected++;
+            this->total_undetected++;
             this->no_detection_counter++;
             if (this->no_detection_counter > 3) {
                 this->drone->log("No detection found.");
@@ -128,7 +131,7 @@ private:
     
     int print_counter;
     int no_detection_counter;
-    int detected, undetected;
+    int total_detected, total_undetected;
     
     
     Eigen::Vector3d pos;

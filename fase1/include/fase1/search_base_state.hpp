@@ -47,6 +47,11 @@ public:
                 const Eigen::Vector2d approx_base = getApproximateBase(bbox);
                 bool is_known_base = false;
                 float min_horizontal_distance = std::numeric_limits<float>::max();
+
+                // Publish estimated base for known bases (red, 15s duration)
+                this->vision->publishEstimatedBase(approx_base,
+                                                   "estimate_" + std::to_string(this->print_counter),
+                                                   -this->mean_base_height);
                 
                 if (this->print_counter % 5 == 0) {
                     this->drone->log("");
@@ -77,6 +82,11 @@ public:
                     this->drone->log("");
                     this->drone->log("New base at: {" + std::to_string(approx_base.x()) + ", " + std::to_string(approx_base.y()) + "}");
                     this->drone->log("Min distance to known base: " + std::to_string(min_horizontal_distance));
+                    
+                    // Publish first detection as yellow marker
+                    this->vision->publishFirstEstimateBase(approx_base,
+                                                          "first_estimate_" + std::to_string(this->print_counter),
+                                                          -this->mean_base_height);
                     
                     blackboard.set<Eigen::Vector2d>("approximate_base", approx_base);
                     return "BASE FOUND";
@@ -151,7 +161,7 @@ private:
         double bbox_x = bbox.center_x;
         double bbox_y = bbox.center_y;
 
-        // Assuming base is at mean_base_height above the ground
+        // Assuming base is at mean_base_height (positive value) above the ground
         double height = -this->pos.z() - this->mean_base_height;
 
         // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).

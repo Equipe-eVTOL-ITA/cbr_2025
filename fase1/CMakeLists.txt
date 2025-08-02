@@ -16,6 +16,7 @@ find_package(OpenCV 4 REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 include_directories(include)
 include_directories(${EIGEN3_INCLUDE_DIR})
@@ -35,6 +36,7 @@ ament_target_dependencies(fase1
   Eigen3
   vision_msgs
   sensor_msgs
+  visualization_msgs
   cv_bridge
 )
 

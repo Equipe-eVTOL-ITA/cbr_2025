@@ -16,14 +16,14 @@ fase1_fsm:
     pid_pos_kd: 0.05
     setpoint: 0.0
 
-    known_base_radius: 1.7
+    known_base_radius: 1.5
     height_to_ground: 1.2
-    # Use positive values for these heights
-    mean_base_height: 0.85
+    mean_base_height: 0.85 # Use positive values for this height
     detection_timeout: 10.0
     # -------------------------------------
     align_tolerance: 0.025
     landing_timeout: 7.0
+    landing_velocity: 0.5 # Positive value
 
 
 base_detector_v2:

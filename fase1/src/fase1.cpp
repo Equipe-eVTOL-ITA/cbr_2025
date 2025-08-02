@@ -129,7 +129,8 @@ public:
             {"mean_base_height", 0.75},
             {"detection_timeout", 10.0},
             {"align_tolerance", 0.05},
-            {"landing_timeout", 8.0}
+            {"landing_timeout", 8.0},
+            {"landing_velocity", 0.5}
         };
         
         auto params = declareAndGetParameters(default_params);
