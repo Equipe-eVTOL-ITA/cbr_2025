@@ -13,20 +13,24 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 from cv_bridge import CvBridge
 from typing import Dict, List, Tuple
 
 
-class BaseDetectorV2(Node):
+class BaseDetector(Node):
     """ROS 2 Node for simplified landing pad detection using combined color regions"""
     
     def __init__(self):
-        super().__init__('base_detector_v2')
+        super().__init__('base_detector')
         
         # Initialize CV bridge
         self.bridge = CvBridge()
+        
+        # Frame counting for debug publishing rate control
+        self.frame_count = 0
+        self.debug_frame_skip = 3  # Publish debug every 3rd frame (10Hz -> 3.33Hz)
         
         # Declare and get parameters
         self._declare_parameters()
@@ -38,17 +42,25 @@ class BaseDetectorV2(Node):
         # ROS 2 subscribers and publishers
         self._setup_ros_interface()
         
-        self.get_logger().info("Base detector v2 node initialized successfully")
+        self.get_logger().info("Base detector node initialized successfully")
     
     def _declare_parameters(self):
         """Declare all ROS 2 parameters with default values"""
         
-        # General parameters
+        # Image Subscription and Detection Publisher
         self.declare_parameter('image_topic', '/vertical_camera/image_raw')
         self.declare_parameter('detection_topic', '/base_detector/detections')
+
+        # Full debug mode
+        self.declare_parameter('full_debug_mode', False)
         self.declare_parameter('mask_debug_topic', '/base_detector/mask_debug')
         self.declare_parameter('bbox_debug_topic', '/base_detector/bbox_debug')
-        self.declare_parameter('enable_debug_output', True)
+        
+        # Light debug mode
+        self.declare_parameter('light_debug_mode', False)
+        self.declare_parameter('light_debug_topic', '/telemetry/camera_debug/compressed')
+        self.declare_parameter('light_debug_size', 400)  # Size for debug images
+        self.declare_parameter('light_debug_quality', 80)  # JPEG compression quality
         
         # Morphological operations
         self.declare_parameter('yellow_morph_kernel_size', 3)
@@ -83,11 +95,21 @@ class BaseDetectorV2(Node):
         
     def _load_parameters(self):
         """Load parameters from ROS 2 parameter server"""
+
+        # Image Subscription and Detection Publisher
         self.image_topic = str(self.get_parameter('image_topic').value)
         self.detection_topic = str(self.get_parameter('detection_topic').value)
+
+        # Full debug mode
+        self.full_debug_mode = bool(self.get_parameter('full_debug_mode').value)
         self.mask_debug_topic = str(self.get_parameter('mask_debug_topic').value)
         self.bbox_debug_topic = str(self.get_parameter('bbox_debug_topic').value)
-        self.enable_debug_output = bool(self.get_parameter('enable_debug_output').value)
+        
+        # Light debug mode
+        self.light_debug_mode = bool(self.get_parameter('light_debug_mode').value)
+        self.light_debug_topic = str(self.get_parameter('light_debug_topic').value)
+        self.light_debug_size = int(self.get_parameter('light_debug_size').value)
+        self.light_debug_quality = int(self.get_parameter('light_debug_quality').value)
         
         # Morphology parameters
         self.yellow_morph_kernel_size = int(self.get_parameter('yellow_morph_kernel_size').value)
@@ -152,7 +174,7 @@ class BaseDetectorV2(Node):
         )
         
         # Debug image publishers
-        if self.enable_debug_output:
+        if self.full_debug_mode:
             self.mask_debug_pub = self.create_publisher(
                 Image,
                 self.mask_debug_topic,
@@ -161,6 +183,14 @@ class BaseDetectorV2(Node):
             self.bbox_debug_pub = self.create_publisher(
                 Image,
                 self.bbox_debug_topic,
+                10
+            )
+            
+        # Telemetry debug publisher (conditional based on debug mode)
+        if self.light_debug_mode:
+            self.telemetry_debug_pub = self.create_publisher(
+                CompressedImage,
+                self.light_debug_topic,
                 10
             )
     
@@ -181,7 +211,7 @@ class BaseDetectorV2(Node):
             self.detection_pub.publish(detection_msg)
             
             # Publish debug images if enabled
-            if self.enable_debug_output:
+            if self.full_debug_mode:
                 if mask_debug_image is not None:
                     mask_msg = self.bridge.cv2_to_imgmsg(mask_debug_image, "bgr8")
                     mask_msg.header = msg.header
@@ -191,6 +221,31 @@ class BaseDetectorV2(Node):
                     bbox_msg = self.bridge.cv2_to_imgmsg(bbox_debug_image, "bgr8")
                     bbox_msg.header = msg.header
                     self.bbox_debug_pub.publish(bbox_msg)
+            
+            # Publish telemetry debug images at reduced rate (3Hz instead of 10Hz)
+            if self.light_debug_mode and hasattr(self, 'telemetry_debug_pub'):
+                self.frame_count += 1
+                if self.frame_count % self.debug_frame_skip == 0:
+                    # Create combined debug image with masks and bounding boxes
+                    telemetry_debug = self._create_telemetry_debug_image(
+                        cv_image, mask_debug_image, bbox_debug_image, detections, msg.header
+                    )
+                    
+                    if telemetry_debug is not None:
+                        # Resize to target size for bandwidth efficiency
+                        telemetry_debug = cv2.resize(telemetry_debug, 
+                                                   (self.light_debug_size, self.light_debug_size))
+                        
+                        # Compress to JPEG and publish as CompressedImage
+                        encode_param = [cv2.IMWRITE_JPEG_QUALITY, self.light_debug_quality]
+                        success, encoded_image = cv2.imencode('.jpg', telemetry_debug, encode_param)
+                        
+                        if success:
+                            compressed_msg = CompressedImage()
+                            compressed_msg.header = msg.header
+                            compressed_msg.format = "jpeg"
+                            compressed_msg.data = encoded_image.tobytes()
+                            self.telemetry_debug_pub.publish(compressed_msg)
                 
         except Exception as e:
             self.get_logger().error(f"Error processing image: {str(e)}")
@@ -345,6 +400,56 @@ class BaseDetectorV2(Node):
         
         return detections
     
+    def _create_telemetry_debug_image(self, original_image: np.ndarray, mask_debug_image: np.ndarray, 
+                                    bbox_debug_image: np.ndarray, detections: List[Dict], header) -> np.ndarray:
+        """
+        Create combined debug image for telemetry with masks and bounding boxes.
+        Optimized to avoid duplicate operations.
+        
+        Args:
+            original_image: Original BGR image
+            mask_debug_image: Color mask visualization (if available)
+            bbox_debug_image: Bounding box visualization (if available)
+            detections: List of detection dictionaries
+            header: ROS header for timestamp info
+            
+        Returns:
+            Combined debug image for telemetry
+        """
+        if bbox_debug_image is not None:
+            # Use bbox_debug_image as base (it already has detections drawn)
+            telemetry_debug = bbox_debug_image.copy()
+        else:
+            # Fallback to original image
+            telemetry_debug = original_image.copy()
+        
+        # If we have mask debug image, overlay it with transparency
+        if mask_debug_image is not None:
+            # Create a mask overlay with 30% transparency
+            alpha = 0.3
+            beta = 1.0 - alpha
+            cv2.addWeighted(mask_debug_image, alpha, telemetry_debug, beta, 0, telemetry_debug)
+        
+        # Add telemetry-specific information
+        height, width = telemetry_debug.shape[:2]
+        
+        # Add timestamp and frame info
+        timestamp_text = f"BaseDetector - {header.stamp.sec}.{header.stamp.nanosec//1000000:03d}"
+        cv2.putText(telemetry_debug, timestamp_text, (10, height - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Add detection count
+        detection_count_text = f"Detections: {len(detections)}"
+        cv2.putText(telemetry_debug, detection_count_text, (10, height - 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Add processing resolution info
+        res_text = f"Src: {width}x{height} -> {self.light_debug_size}x{self.light_debug_size}"
+        cv2.putText(telemetry_debug, res_text, (10, height - 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        return telemetry_debug
+    
     def _create_detection_message(self, detections: List[Dict], header) -> Detection2DArray:
         """Create ROS 2 Detection2DArray message from detections"""
         detection_array = Detection2DArray()
@@ -378,7 +483,7 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        base_detector = BaseDetectorV2()
+        base_detector = BaseDetector()
         rclpy.spin(base_detector)
     except KeyboardInterrupt:
         pass

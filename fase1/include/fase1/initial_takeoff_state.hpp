@@ -35,18 +35,19 @@ public:
         this->max_velocity = *blackboard.get<float>("max_vertical_velocity");
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
         float takeoff_height = *blackboard.get<float>("takeoff_height");
-        float known_base_radius = *blackboard.get<float>("known_base_radius");
-        
-        std::vector<Base> bases;
-        bases.push_back({this->drone->getLocalPosition(), true});
-        blackboard.set<std::vector<Base>>("bases", bases);
-        this->vision->publishKnownBases(bases, known_base_radius);
-
         
         this->pos = this->drone->getLocalPosition();
         this->initial_yaw = this->drone->getOrientation()[2];
         this->goal = Eigen::Vector3d({this->pos[0], this->pos[1], takeoff_height});
+
+
+        Base base{this->drone->getLocalPosition(), true};
+        this->vision->publishBaseDetection("confirmed_base", this->pos.head<2>(), this->pos.z());
         
+        std::vector<Base> bases;
+        bases.push_back(base);
+        blackboard.set<std::vector<Base>>("bases", bases);
+
         this->print_counter = 0;
 
         this->drone->log("Initial Yaw: " + std::to_string(initial_yaw));

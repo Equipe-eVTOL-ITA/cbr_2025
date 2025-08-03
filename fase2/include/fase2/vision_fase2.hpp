@@ -3,6 +3,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
 #include <vision_msgs/msg/detection2_d.hpp>
+#include <custom_msgs/msg/base_detection.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core.hpp>
@@ -81,6 +82,9 @@ public:
             }
         );
         
+        // Publisher for base detection telemetry
+        base_detection_pub_ = this->create_publisher<custom_msgs::msg::BaseDetection>("/telemetry/bases", 10);
+        
         RCLCPP_INFO(this->get_logger(), "Vision node initialized successfully");
     }
 
@@ -134,6 +138,21 @@ public:
     }
 
     // -------------------------------------------------------------------------------------
+    
+    // Method to publish base detection telemetry
+    void publishBaseDetection(const Eigen::Vector2d& position, const std::string& base_type, 
+                            float confidence = 1.0f, uint32_t detection_id = 0) {
+        auto msg = custom_msgs::msg::BaseDetection();
+        msg.header.stamp = this->get_clock()->now();
+        msg.position.x = position.x();
+        msg.position.y = position.y(); 
+        msg.position.z = 0.0; // Ground level
+        msg.base_type = base_type;
+        msg.confidence = confidence;
+        msg.detection_id = detection_id;
+        
+        base_detection_pub_->publish(msg);
+    }
 
 private:
     rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr detections_sub_;
@@ -144,6 +163,8 @@ private:
     rclcpp::Subscription<vision_msgs::msg::Detection2D>::SharedPtr package_sub_;
     BoundingBox package_detection_;
     std::chrono::steady_clock::time_point package_last_update_;
+    
+    rclcpp::Publisher<custom_msgs::msg::BaseDetection>::SharedPtr base_detection_pub_;
 
     bool is_there_detection_{false};
     BoundingBox closest_bbox_;

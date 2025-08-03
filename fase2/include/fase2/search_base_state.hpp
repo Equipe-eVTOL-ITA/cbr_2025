@@ -41,6 +41,9 @@ public:
                 const Eigen::Vector2d approx_base = getApproximateBase(bbox);
                 drone->log("Estimate: {" + std::to_string(approx_base.x()) + ", " + std::to_string(approx_base.y()) + "}");
 
+                // Publish base detection to telemetry
+                this->vision->publishBaseDetection(approx_base, "detected_base", 0.8, 0);
+
                 bool is_known_base = false;
                 for (const auto& base : *this->bases) {
                     float horizontal_distance = (approx_base - base.coordinates.head<2>()).norm();
@@ -54,6 +57,9 @@ public:
                 }
 
                 if (!is_known_base) {
+                    // Publish new base detection to telemetry
+                    this->vision->publishBaseDetection(approx_base, "new_base", 0.9, 0);
+                    
                     blackboard.set<Eigen::Vector2d>("approximate_base", approx_base);
                     return "BASE FOUND";
                 }

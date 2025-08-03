@@ -42,10 +42,10 @@ public:
 
     void on_exit(fsm::Blackboard &blackboard) override {
         Eigen::Vector3d pos = this->drone->getLocalPosition();
+        this->vision->publishBaseDetection("confirmed_base", pos.head<2>(), pos.z());
 
         auto bases = blackboard.get<std::vector<Base>>("bases");
         bases->push_back({pos, true});
-        this->vision->publishKnownBases(*bases, this->known_base_radius);
 
         drone->log("New base {" + std::to_string(bases->size()) + "}: " +
                     std::to_string(pos.x()) + ", " + std::to_string(pos.y()) + ", " + std::to_string(pos.z()));

@@ -10,6 +10,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <custom_msgs/msg/position.hpp>
+#include <custom_msgs/msg/log_message.hpp>
+#include <custom_msgs/msg/drone_status.hpp>
 
 #include <px4_msgs/msg/vehicle_status.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
@@ -19,6 +21,7 @@
 #include <px4_msgs/msg/vehicle_odometry.hpp>
 #include <px4_msgs/msg/vehicle_rates_setpoint.hpp>
 #include <px4_msgs/msg/airspeed.hpp>
+#include <px4_msgs/msg/battery_status.hpp>
 
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
@@ -210,9 +213,16 @@ private:
 	rclcpp::Publisher<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr vehicle_rates_setpoint_pub_;
 	
 	rclcpp::Subscription<px4_msgs::msg::Airspeed>::SharedPtr vehicle_airspeed_sub_;
+	
+	rclcpp::Subscription<px4_msgs::msg::BatteryStatus>::SharedPtr battery_status_sub_;
 
 	rclcpp::Publisher<custom_msgs::msg::Position>::SharedPtr position_pub_;
 	rclcpp::TimerBase::SharedPtr position_timer_;
+	
+	// Telemetry publishers
+	rclcpp::Publisher<custom_msgs::msg::LogMessage>::SharedPtr log_pub_;
+	rclcpp::Publisher<custom_msgs::msg::DroneStatus>::SharedPtr drone_status_pub_;
+	rclcpp::TimerBase::SharedPtr status_timer_;
 
 	DronePX4::ARMING_STATE arming_state_{DronePX4::ARMING_STATE::DISARMED};
 	DronePX4::FLIGHT_MODE flight_mode_{DronePX4::FLIGHT_MODE::UNKNOWN_MODE};
@@ -232,6 +242,7 @@ private:
 	float current_vel_z_{0};
 	float ground_speed_{0};
 	float airspeed_{0};
+	float battery_voltage_{0.0f};
 
 	uint8_t target_component_{1};
 	uint8_t source_system_{255};
@@ -256,6 +267,8 @@ private:
     Eigen::Vector3d convertPositionFRDtoNED(const Eigen::Vector3d& position_frd) const;
     Eigen::Vector3d convertVelocityNEDtoFRD(const Eigen::Vector3d& velocity_ned) const;
     Eigen::Vector3d convertVelocityFRDtoNED(const Eigen::Vector3d& velocity_frd) const;
+    
+    void publishDroneStatus();
 };
 
 

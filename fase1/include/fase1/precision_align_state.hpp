@@ -75,9 +75,8 @@ public:
             this->approx_offset = this->getApproximateOffset(bbox);
 
             auto approx_base = this->pos.head<2>() + this->approx_offset;
-            this->vision->publishEstimatedBase(approx_base,
-                                                "estimate_" + std::to_string(this->print_counter),
-                                                -this->mean_base_height);
+            this->vision->publishBaseDetection("detected_base", approx_base, -this->mean_base_height); 
+            
 
             if (this->approx_offset.norm() < this->align_tolerance){
                 return "PRECISELY ALIGNED";

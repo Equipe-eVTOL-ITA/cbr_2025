@@ -48,14 +48,12 @@ ament_target_dependencies(cbr_drone_lib
   custom_msgs
 )
 
-add_executable(pos_to_rviz
-  src/pos_to_rviz.cpp
+add_executable(system_health
+  src/system_health.cpp
 )
 
-ament_target_dependencies(pos_to_rviz
+ament_target_dependencies(system_health
   rclcpp
-  geometry_msgs
-  nav_msgs
   custom_msgs
 )
 
@@ -79,7 +77,7 @@ install(
   INCLUDES DESTINATION include
 )
 
-install(TARGETS pos_to_rviz
+install(TARGETS system_health
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

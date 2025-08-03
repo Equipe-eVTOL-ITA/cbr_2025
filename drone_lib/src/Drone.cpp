@@ -22,6 +22,10 @@ Drone::Drone() : Node("Drone") {
 	custom_qos.best_effort();
 	custom_qos.durability(rclcpp::DurabilityPolicy::Volatile);
 
+	rclcpp::QoS telemetry_qos(10); // telemetry logs and status
+	telemetry_qos.best_effort();
+	telemetry_qos.durability(rclcpp::DurabilityPolicy::Volatile);
+
 	std::string vehicle_id_prefix = "";
 
 	// Essa parte será útil para múltiplos drones
@@ -249,7 +253,7 @@ Drone::Drone() : Node("Drone") {
 
 
 	this->position_pub_ = this->create_publisher<custom_msgs::msg::Position>(
-		"/position", custom_qos);
+		"/telemetry/position", custom_qos);
 
 	// Critical 20Hz position timer for FSM coordination - always active
 	this->position_timer_ = this->create_wall_timer(
@@ -285,6 +289,22 @@ Drone::Drone() : Node("Drone") {
 
 			this->position_pub_->publish(msg);
 		});
+
+	// Add telemetry publishers
+	this->log_pub_ = this->create_publisher<custom_msgs::msg::LogMessage>("/telemetry/logs", telemetry_qos);
+	this->drone_status_pub_ = this->create_publisher<custom_msgs::msg::DroneStatus>("/telemetry/drone_status", telemetry_qos);
+	
+	// Subscribe to battery status
+	this->battery_status_sub_ = this->create_subscription<px4_msgs::msg::BatteryStatus>(
+		vehicle_id_prefix + "/fmu/out/battery_status", px4_qos,
+		[this](const px4_msgs::msg::BatteryStatus::SharedPtr msg) {
+			this->battery_voltage_ = msg->voltage_filtered_v;
+		});
+	
+	// Status publisher timer (2Hz)
+	this->status_timer_ = this->create_wall_timer(
+		std::chrono::milliseconds(500),
+		std::bind(&Drone::publishDroneStatus, this));
 
 }
 
@@ -639,7 +659,27 @@ double Drone::getTime() {
 }
 
 void Drone::log(const std::string &info) {
+	// Existing console logging
 	RCLCPP_INFO(this->get_logger(), info.c_str());
+	
+	// New telemetry logging
+	auto log_msg = custom_msgs::msg::LogMessage();
+	log_msg.header.stamp = this->get_clock()->now();
+	log_msg.node_name = this->get_name();
+	log_msg.level = 3; // INFO level
+	log_msg.message = info;
+	
+	log_pub_->publish(log_msg);
+}
+
+void Drone::publishDroneStatus() {
+	auto status_msg = custom_msgs::msg::DroneStatus();
+	status_msg.header.stamp = this->get_clock()->now();
+	status_msg.arming_state = static_cast<uint8_t>(this->arming_state_);
+	status_msg.flight_mode = static_cast<uint8_t>(this->flight_mode_);
+	status_msg.battery_voltage = this->battery_voltage_;
+	
+	drone_status_pub_->publish(status_msg);
 }
 
 
