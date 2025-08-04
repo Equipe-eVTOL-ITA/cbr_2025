@@ -3,28 +3,8 @@
 
 telemetry_handler:
   ros__parameters:
-    # Medium bandwidth for simulation (100 KB/s)
-    bandwidth:
-      max_total: 100000
-      priority_allocation:
-        position: 20      # Navigation data
-        drone_status: 20  # Flight status
-        logs: 15          # Development logs
-        system_health: 15 # System monitoring
-        bases: 15         # Detection testing
-        camera_debug: 15  # Camera debug for development
-    
-    log_level: 3  # DEBUG level
-
     visualization:
       known_base_radius: 1.5    
-
-    recording:
-      enable: true
-      max_duration_minutes: 45
-      max_file_size_mb: 750
-      output_directory: "/tmp/simulation_logs"
-
 
 base_detector:
   ros__parameters:

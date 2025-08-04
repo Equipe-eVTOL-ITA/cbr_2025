@@ -2,22 +2,9 @@
 
 telemetry_handler:
   ros__parameters:
-    # High bandwidth for full telemetry (400 KB/s)
-    bandwidth:
-      max_total: 400000
-      priority_allocation:
-        position: 15      # Navigation data
-        drone_status: 15  # Flight status
-        logs: 10          # All log messages
-        system_health: 10 # Full system monitoring
-        bases: 20         # Detection visualization
-        camera_debug: 30  # Full camera debug stream
-
       visualization:
         known_base_radius: 1.5
-    
-    # Full logging on ground station
-    log_level: 2 # INFO level
+
 
 log_viewer:
   ros__parameters:
