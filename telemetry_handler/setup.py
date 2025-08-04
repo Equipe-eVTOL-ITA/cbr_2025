@@ -21,9 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'telemetry_handler = telemetry_handler.telemetry_handler:main',
-            'log_viewer = telemetry_handler.log_viewer:main',
-            'telemetry_recorder = telemetry_handler.telemetry_recorder:main',
-            'telemetry_dashboard = telemetry_handler.telemetry_dashboard:main'
+            'telemetry_recorder = telemetry_recorder.telemetry_recorder:main',
+            'telemetry_dashboard = telemetry_dashboard.telemetry_dashboard:main'
         ],
     },
 )

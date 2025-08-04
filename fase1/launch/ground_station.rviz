@@ -8,7 +8,7 @@ Panels:
         - /Status1
         - /Image1
       Splitter Ratio: 0.5
-    Tree Height: 439
+    Tree Height: 363
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -142,9 +142,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        confirmed_base_0: true
-        detected_base_0: true
-        first_estimate_base_0: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -236,5 +234,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 870
-  X: 977
-  Y: 27
+  X: 1047
+  Y: 32

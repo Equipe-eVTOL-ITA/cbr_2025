@@ -1,11 +1,6 @@
 # Simulation configuration - development and testing
 # Inherits from common.yaml with simulation-specific overrides
 
-telemetry_handler:
-  ros__parameters:
-    visualization:
-      known_base_radius: 1.5    
-
 base_detector:
   ros__parameters:
     # Image subscription and Detector publisher topics
@@ -55,16 +50,26 @@ base_detector:
     combination_iterations: 1
 
 
-log_viewer:
-  ros__parameters:
-    enable_gui: true
-    max_displayed_logs: 1000
-    auto_scroll: true
-    filter_by_level: false
-
 telemetry_recorder:
   ros__parameters:
     enable: true
     max_duration_minutes: 10
     max_file_size_mb: 1000
     output_directory: "/tmp/flight_logs/simulation"
+
+
+telemetry_dashboard:
+  ros__parameters:
+    network:
+      ping_target: "8.8.8.8"  # Network monitoring target
+    topics:
+      position: "/telemetry/position"
+      drone_status: "/telemetry/drone_status"
+      system_health: "/telemetry/system_health" 
+      logs: "/telemetry/logs"
+
+
+telemetry_handler:
+  ros__parameters:
+    visualization:
+      known_base_radius: 1.5    
