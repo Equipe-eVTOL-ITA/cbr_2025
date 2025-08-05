@@ -50,9 +50,12 @@ public:
         drone->log("New base {" + std::to_string(bases->size()) + "}: " +
                     std::to_string(pos.x()) + ", " + std::to_string(pos.y()) + ", " + std::to_string(pos.z()));
 
-        if (bases->size() == 7){
+        auto num_bases = *blackboard.get<float>("num_bases");
+        size_t total_bases = static_cast<size_t>(num_bases);
+
+        if (bases->size() == total_bases + 1){  // +1 because home is also in the vector
             blackboard.set<bool>("finished_bases", true);
-            drone->log("Visited all 6 bases");
+            drone->log("Visited all " + std::to_string(total_bases) + " bases");
         }
     }
 

@@ -40,10 +40,9 @@ class TelemetryRecorder(Node):
             namespace='',
             parameters=[
                 ('recording.enable', False),
-                ('recording.auto_start_recording', False),
                 ('recording.max_duration_minutes', 30),
                 ('recording.max_file_size_mb', 500),
-                ('recording.output_directory', '/tmp/telemetry_logs'),
+                ('recording.output_directory', '~/frtl_2025_ws/flight_logs'),
                 ('recording.recording_formats', ['rosbag', 'csv']),
                 ('recording.include_images', False),
                 ('topics.position', '/telemetry/position'),
@@ -57,10 +56,10 @@ class TelemetryRecorder(Node):
         
         # Get parameters
         self.recording_enabled = self.get_parameter('recording.enable').value
-        self.auto_start = self.get_parameter('recording.auto_start_recording').value
         self.max_duration = self.get_parameter('recording.max_duration_minutes').value * 60  # Convert to seconds
         self.max_file_size = self.get_parameter('recording.max_file_size_mb').value * 1024 * 1024  # Convert to bytes
-        self.output_dir = self.get_parameter('recording.output_directory').value
+        output_dir_param = self.get_parameter('recording.output_directory').value
+        self.output_dir = os.path.expanduser(str(output_dir_param)) if output_dir_param else '/tmp/telemetry_logs'
         self.formats = self.get_parameter('recording.recording_formats').value
         self.include_images = self.get_parameter('recording.include_images').value
         
@@ -138,7 +137,7 @@ class TelemetryRecorder(Node):
         self.recording_timer = None
         
         # Start recording if auto-start is enabled
-        if self.auto_start and self.recording_enabled:
+        if self.recording_enabled:
             self.start_recording()
             
         self.get_logger().info(f"TelemetryRecorder initialized, output dir: {self.output_dir}")

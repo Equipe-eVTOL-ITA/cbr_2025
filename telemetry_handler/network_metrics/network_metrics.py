@@ -8,8 +8,6 @@ import subprocess
 import threading
 from dataclasses import dataclass
 from typing import Dict, Optional, List
-import rclpy
-from rclpy.node import Node
 
 @dataclass
 class NetworkHealth:
@@ -41,12 +39,15 @@ class NetworkMetrics:
         '/telemetry/logs': 10.0,          # Up to 10Hz (variable)
     }
     
-    def __init__(self, ping_target: str = "8.8.8.8"):
+    def __init__(self, ping_target: str = "192.168.0.152", ground_station_ip: str = "192.168.0.100"):
+        """Initialize network metrics with configurable ping targets."""
         self.ping_target = ping_target
+        self.ground_station_ip = ground_station_ip
         self.topic_stats: Dict[str, List[float]] = {}
         self.topic_health: Dict[str, TopicHealth] = {}
         self._ping_results: List[float] = []
         self._running = False
+        self._ping_thread: Optional[threading.Thread] = None
         
     def start_monitoring(self):
         """Start background monitoring."""
@@ -114,21 +115,36 @@ class NetworkMetrics:
         while self._running:
             try:
                 result = subprocess.run(
-                    ['ping', '-c', '1', '-W', '1000', self.ping_target],
-                    capture_output=True, text=True, timeout=2
+                    ['ping', '-c', '1', '-W', '2', self.ping_target],
+                    capture_output=True, text=True, timeout=5
                 )
                 
                 if result.returncode == 0:
                     # Parse latency from ping output
+                    latency_found = False
                     for line in result.stdout.split('\n'):
                         if 'time=' in line:
-                            latency = float(line.split('time=')[1].split(' ')[0])
-                            self._ping_results.append(latency)
-                            break
+                            try:
+                                # Extract time value (handles both "time=1.23" and "time=1.23 ms")
+                                time_part = line.split('time=')[1]
+                                latency_str = time_part.split()[0]  # Get first part before space
+                                latency = float(latency_str)
+                                self._ping_results.append(latency)
+                                latency_found = True
+                                break
+                            except (ValueError, IndexError):
+                                continue
+                    
+                    if not latency_found:
+                        # Ping succeeded but couldn't parse latency
+                        self._ping_results.append(1000.0)
                 else:
                     # Ping failed - record high latency
                     self._ping_results.append(1000.0)
                     
+            except subprocess.TimeoutExpired:
+                # Ping command timed out
+                self._ping_results.append(1000.0)
             except Exception:
                 self._ping_results.append(1000.0)
                 

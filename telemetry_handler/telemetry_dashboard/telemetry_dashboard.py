@@ -47,8 +47,16 @@ class TelemetryDashboardNode(Node):
     def __init__(self):
         super().__init__('telemetry_dashboard')
         
-        # Initialize network monitoring
-        self.network_metrics = NetworkMetrics()
+        # Declare parameters for network monitoring
+        self.declare_parameter('network.ping_target', '192.168.0.152')
+        self.declare_parameter('network.ground_station_ip', '192.168.0.100')
+        
+        # Get network parameters with proper type handling
+        ping_target = str(self.get_parameter('network.ping_target').value or '192.168.0.152')
+        ground_station_ip = str(self.get_parameter('network.ground_station_ip').value or '192.168.0.100')
+        
+        # Initialize network monitoring with configurable targets
+        self.network_metrics = NetworkMetrics(ping_target, ground_station_ip)
         self.network_metrics.start_monitoring()
         
         # Initialize GUI
@@ -58,7 +66,7 @@ class TelemetryDashboardNode(Node):
         self.subscribers = {}
         self._setup_subscribers()
         
-        self.get_logger().info("Telemetry Dashboard initialized")
+        self.get_logger().info(f"Telemetry Dashboard initialized - pinging {ping_target}")
         
     def _setup_subscribers(self):
         """Setup ROS2 subscribers based on topic configuration."""

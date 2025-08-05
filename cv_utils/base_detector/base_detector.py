@@ -83,9 +83,8 @@ class BaseDetector(Node):
         self.declare_parameter('yellow_upper_s', 255)
         self.declare_parameter('yellow_upper_v', 255)
         
-        # Detection constraints
-        self.declare_parameter('combined_min_area', 1000)
-        self.declare_parameter('combined_max_area', 50000)
+        self.declare_parameter('combined_min_area', 0.001)
+        self.declare_parameter('combined_max_area', 1.0)
         self.declare_parameter('combined_aspect_ratio_min', 0.5)
         self.declare_parameter('combined_aspect_ratio_max', 2.0)
         
@@ -118,8 +117,8 @@ class BaseDetector(Node):
         self.blue_morph_iterations = int(self.get_parameter('blue_morph_iterations').value)
         
         # Detection constraints
-        self.combined_min_area = int(self.get_parameter('combined_min_area').value)
-        self.combined_max_area = int(self.get_parameter('combined_max_area').value)
+        self.combined_min_area = float(self.get_parameter('combined_min_area').value)
+        self.combined_max_area = float(self.get_parameter('combined_max_area').value)
         self.combined_aspect_ratio_min = float(self.get_parameter('combined_aspect_ratio_min').value)
         self.combined_aspect_ratio_max = float(self.get_parameter('combined_aspect_ratio_max').value)
         
@@ -272,21 +271,24 @@ class BaseDetector(Node):
         
         # Create bbox debug image
         bbox_debug_image = image.copy()
-        
+
+        img_height, img_width = blue_mask.shape[:2]
+        img_area = img_height * img_width
+
         # Find regions containing both colors
         detections = self._find_combined_regions(blue_mask, yellow_mask)
         
         # Draw detections on bbox debug image
         for detection in detections:
             x, y, w, h = detection['bbox']
-            area = detection['area']
+            area = detection['area'] / img_area
             aspect_ratio = detection['aspect_ratio']
             
             # Draw bounding box in pink
             cv2.rectangle(bbox_debug_image, (x, y), (x+w, y+h), (255, 0, 255), 2)
             
             # Add text with area and aspect ratio
-            text = f"Area: {area:.0f}, AR: {aspect_ratio:.2f}"
+            text = f"Area: {area:.3f}, AR: {aspect_ratio:.2f}"
             cv2.putText(bbox_debug_image, text, (x, y-10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
         
@@ -341,6 +343,14 @@ class BaseDetector(Node):
         """Find regions that contain both yellow and blue pixels"""
         detections = []
         
+        # Get image dimensions for normalization calculations
+        img_height, img_width = blue_mask.shape[:2]
+        img_area = img_height * img_width
+        
+        # Convert normalized area thresholds to actual pixel counts
+        min_area_pixels = self.combined_min_area * img_area
+        max_area_pixels = self.combined_max_area * img_area
+        
         # Dilate both masks to connect adjacent regions
         combination_kernel = cv2.getStructuringElement(
             cv2.MORPH_ELLIPSE, 
@@ -363,8 +373,7 @@ class BaseDetector(Node):
         for contour in contours:
             area = cv2.contourArea(contour)
             
-            # Check area constraints
-            if area < self.combined_min_area or area > self.combined_max_area:
+            if area < min_area_pixels or area > max_area_pixels:
                 continue
             
             # Get bounding rectangle
@@ -383,7 +392,7 @@ class BaseDetector(Node):
             yellow_pixels = np.sum(roi_yellow > 0)
             
             # Require minimum presence of both colors
-            min_pixels = 50  # Minimum pixels for each color
+            min_pixels = 100  # Minimum pixels for each color
             if blue_pixels < min_pixels or yellow_pixels < min_pixels:
                 continue
             

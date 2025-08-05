@@ -140,6 +140,8 @@ public:
             {"fictual_home_y", -0.75},
             {"fictual_home_z", 0.6},
 
+            {"num_bases", 6.0},
+
             {"grid_y_length", -6.0},
             {"grid_step_x", 2.0},
             {"grid_num_steps", 3.0},

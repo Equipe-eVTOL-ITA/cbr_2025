@@ -4,6 +4,8 @@ fase1_fsm:
     fictual_home_y: -1.0
     fictual_home_z: -0.6 # Remember z points Down
 
+    num_bases: 6.0 # Bases to visit (excluding home)
+    
     # Dynamic grid parameters
     grid_y_length: -6.0 # Negative -> grid spawns to the left of home
     grid_step_x: 2.0 # Step size in x direction
@@ -29,6 +31,7 @@ fase1_fsm:
     align_tolerance: 0.025
     landing_timeout: 7.0
     landing_velocity: 0.5 # Positive value
+    
 
 fase1_vision:
   ros__parameters:

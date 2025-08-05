@@ -11,7 +11,7 @@ telemetry_recorder:
     enable: true
     max_duration_minutes: 10
     max_file_size_mb: 1000
-    output_directory: "/tmp/flight_logs/ground_station"
+    output_directory: "~/frtl_2025_ws/flight_logs/ground_station"
 
 telemetry_dashboard:
   ros__parameters:
