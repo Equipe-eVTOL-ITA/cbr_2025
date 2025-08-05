@@ -36,19 +36,47 @@ public:
             }
         }
         
-        
+        // DYNAMIC GRID ----------------------------------------------------
+
         float takeoff_height = *this->blackboard_get<float>("takeoff_height");
+        float home_x = *this->blackboard_get<float>("fictual_home_x");
+        float home_y = *this->blackboard_get<float>("fictual_home_y");
+        float y_length = *this->blackboard_get<float>("grid_y_length");
+        float step_x = *this->blackboard_get<float>("grid_step_x");
+        float num_steps = *this->blackboard_get<float>("grid_num_steps");
+
+        int state = 0;
+        int num_steps_taken = 0;
+        bool finished = false;
+        float x_coord = home_x;
+        float y_coord = home_y;
 
         std::vector<ArenaPoint> waypoints;
-        waypoints.push_back({Eigen::Vector3d({1.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({3.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({3.0, -1.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({5.0, -1.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({5.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({6.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({6.0, -1.0, takeoff_height})});
+        while (num_steps_taken < num_steps || !finished) {
+            if (state % 4 == 0) {
+                // Go left
+                y_coord = home_y + y_length;
+                finished = true;
+            } else if (state % 4 == 1 || state % 4 == 3) {
+                // Go front
+                x_coord += step_x;
+                num_steps_taken++;
+                finished = false;
+            } else {
+                // Go right
+                y_coord = home_y;
+                finished = true;
+            }
+            state++;
+            waypoints.push_back({Eigen::Vector3d({x_coord, y_coord, takeoff_height})});
+        }
         this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
         this->blackboard_set<bool>("finished_bases", false);
+
+        // ------------------------------------------------------------------
+
+
+        // STATE MACHINE ----------------------------------------------------
 
 
         this->add_state("INITIAL TAKEOFF", std::make_unique<InitialTakeoffState>());
@@ -111,6 +139,10 @@ public:
             {"fictual_home_x", 1.0},
             {"fictual_home_y", -0.75},
             {"fictual_home_z", 0.6},
+
+            {"grid_y_length", -6.0},
+            {"grid_step_x", 2.0},
+            {"grid_num_steps", 3.0},
 
             {"takeoff_height", -2.0},
             {"max_vertical_velocity", 1.5},

@@ -15,13 +15,17 @@ The `telemetry_handler` processes and displays telemetry data from various drone
 
 ### Subscribed topics
 
-| Topic | Message Type | Rate | Description |
-|-------|-------------|------|-------------|
-| `/telemetry/position` | `custom_msgs/Position` | 20Hz | Drone position and velocity in FRD and NED coordinates |
-| `/telemetry/drone_status` | `custom_msgs/DroneStatus` | 2Hz | Flight mode, arming state, and battery information |
-| `/telemetry/system_health` | `custom_msgs/SystemHealth` | 1Hz | CPU, memory, disk usage, and temperature monitoring |
-| `/telemetry/logs` | `custom_msgs/LogMessage` | ~10Hz | System log messages with levels and node information |
-| `/telemetry/bases` | `custom_msgs/BaseDetection` | Variable | Detected landing base positions and classifications |
+| Topic | Message Type | Rate | Description | Publisher |
+|-------|-------------|------|-------------|-------------|
+| `/telemetry/position` | `custom_msgs/Position` | 20Hz | Drone position and velocity in FRD and NED coordinates | `Drone` |
+| `/telemetry/drone_status` | `custom_msgs/DroneStatus` | 2Hz | Flight mode, arming state, and battery information | `Drone` |
+| `/telemetry/system_health` | `custom_msgs/SystemHealth` | 1Hz | CPU, memory, disk usage, and temperature monitoring | `SystemHealth` |
+| `/telemetry/logs` | `custom_msgs/LogMessage` | ~10Hz | System log messages with levels and node information | `FSM` |
+| `/telemetry/bases` | `custom_msgs/BaseDetection` | Variable | Detected landing base positions and classifications | `BaseDetector` |
+| `/telemetry/camera_debug` | `/telemetry/camera_debug/compressed` | ~3Hz | Compressed image + bbox annotations | `BaseDetector` | 
+
+
+
 
 ### Published topics (Visualization)
 

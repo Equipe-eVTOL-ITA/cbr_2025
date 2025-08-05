@@ -32,6 +32,9 @@ public:
         rclcpp::QoS vision_qos(10);
         vision_qos.best_effort();
         vision_qos.durability(rclcpp::DurabilityPolicy::Volatile);
+
+        this->declare_parameter<double>("timeout", 10.0);
+        timeout_ = std::chrono::duration<double>(this->get_parameter("timeout").as_double());
         
         detections_sub_ = this->create_subscription<vision_msgs::msg::Detection2DArray>(
             "/vertical_camera/classification",
@@ -67,7 +70,10 @@ public:
 
         base_detection_pub_ = this->create_publisher<custom_msgs::msg::BaseDetection>("/telemetry/bases", 10);
         
+        std::string timeout_str = std::to_string(timeout_.count());
+        RCLCPP_INFO(this->get_logger(), "Vision node initialized successfully, timeout: %s seconds", timeout_str.c_str());
         RCLCPP_INFO(this->get_logger(), "Vision node initialized successfully");
+
     }
 
     double lastDetectionTime() {
@@ -89,6 +95,8 @@ public:
     }
 
     bool isThereDetection(){
+        if (this->lastDetectionTime() > this->timeout_.count())
+            return false;
         return this->is_there_detection_;
     }
 
@@ -119,6 +127,7 @@ private:
     std::vector<BoundingBox> detections_;    
     std::chrono::steady_clock::time_point detection_last_update_;
     std::chrono::steady_clock::time_point valid_detection_last_update_;
+    std::chrono::duration<double> timeout_{10.0};
 
     bool is_there_detection_{false};
     BoundingBox closest_bbox_;
