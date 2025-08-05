@@ -2,7 +2,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
-#include <vision_msgs/msg/detection2_d.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <custom_msgs/msg/base_detection.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -12,6 +13,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include "Base.hpp"
 
 struct BoundingBox {
     float center_x;
@@ -30,6 +32,9 @@ public:
         rclcpp::QoS vision_qos(10);
         vision_qos.best_effort();
         vision_qos.durability(rclcpp::DurabilityPolicy::Volatile);
+
+        this->declare_parameter<double>("timeout", 10.0);
+        timeout_ = std::chrono::duration<double>(this->get_parameter("timeout").as_double());
         
         detections_sub_ = this->create_subscription<vision_msgs::msg::Detection2DArray>(
             "/vertical_camera/classification",
@@ -63,32 +68,13 @@ public:
             }
         );
 
-        package_sub_ = this->create_subscription<vision_msgs::msg::Detection2D>(
-            "/package/classification",
-            vision_qos,
-            [this](const vision_msgs::msg::Detection2D::SharedPtr msg) {
-                this->package_last_update_ = std::chrono::steady_clock::now();
-
-                BoundingBox bbox;
-                bbox.center_x = msg->bbox.center.position.x;
-                bbox.center_y = msg->bbox.center.position.y;
-                bbox.width = msg->bbox.size_x;
-                bbox.height = msg->bbox.size_y;
-                bbox.confidence = msg->results[0].hypothesis.score;
-                bbox.class_id = msg->results[0].hypothesis.class_id;
-                bbox.timestamp = msg->header.stamp.sec * 1000000000LL + msg->header.stamp.nanosec;
-
-                this->package_detection_ = bbox;
-            }
-        );
-        
-        // Publisher for base detection telemetry
         base_detection_pub_ = this->create_publisher<custom_msgs::msg::BaseDetection>("/telemetry/bases", 10);
         
+        std::string timeout_str = std::to_string(timeout_.count());
+        RCLCPP_INFO(this->get_logger(), "Vision node initialized successfully, timeout: %s seconds", timeout_str.c_str());
         RCLCPP_INFO(this->get_logger(), "Vision node initialized successfully");
-    }
 
-    // BASE GETTERS ------------------------------------------------------------------------
+    }
 
     double lastDetectionTime() {
         auto now = std::chrono::steady_clock::now();
@@ -111,42 +97,24 @@ public:
     bool isThereDetection(){
         if (this->lastDetectionTime() > this->timeout_.count())
             return false;
-
         return this->is_there_detection_;
     }
 
-    std::vector<BoundingBox> getDetections(){
+    std::vector<BoundingBox> getDetections() {
         return this->detections_;
     }
 
-    // -------------------------------------------------------------------------------------
-
-
-    // PACKAGE GETTERS ---------------------------------------------------------------------
-
-    double lastPackageTime(){
-        auto now = std::chrono::steady_clock::now();
-        return std::chrono::duration<double>(now - package_last_update_).count();
-    }
-
-    BoundingBox getPackageBbox(){
-        return this->package_detection_;
-    }
-
-    bool isTherePackage(){
-        return this->lastPackageTime() < this->timeout_.count() ? true : false;
-    }
-
-    // -------------------------------------------------------------------------------------
-    
-    // Method to publish base detection telemetry
-    void publishBaseDetection(const Eigen::Vector2d& position, const std::string& base_type, 
-                            float confidence = 1.0f, uint32_t detection_id = 0) {
+    void publishBaseDetection(const std::string& base_type,
+                            const Eigen::Vector2d& position,
+                            float mean_base_height = -0.1,
+                            float confidence = 1.0f,
+                            uint32_t detection_id = 0) 
+    {
         auto msg = custom_msgs::msg::BaseDetection();
         msg.header.stamp = this->get_clock()->now();
         msg.position.x = position.x();
         msg.position.y = position.y(); 
-        msg.position.z = 0.0; // Ground level
+        msg.position.z = mean_base_height;
         msg.base_type = base_type;
         msg.confidence = confidence;
         msg.detection_id = detection_id;
@@ -159,18 +127,15 @@ private:
     std::vector<BoundingBox> detections_;    
     std::chrono::steady_clock::time_point detection_last_update_;
     std::chrono::steady_clock::time_point valid_detection_last_update_;
-
-    rclcpp::Subscription<vision_msgs::msg::Detection2D>::SharedPtr package_sub_;
-    BoundingBox package_detection_;
-    std::chrono::steady_clock::time_point package_last_update_;
-    
-    rclcpp::Publisher<custom_msgs::msg::BaseDetection>::SharedPtr base_detection_pub_;
+    std::chrono::duration<double> timeout_{10.0};
 
     bool is_there_detection_{false};
     BoundingBox closest_bbox_;
     float min_distance_{0.0f};
 
-    std::chrono::duration<double> timeout_{1.0};
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+    rclcpp::Publisher<custom_msgs::msg::BaseDetection>::SharedPtr base_detection_pub_;
+
 
     void computeBboxes(){
         Eigen::Vector2d image_center = Eigen::Vector2d({0.5, 0.5});
@@ -193,6 +158,5 @@ private:
         }
         this->closest_bbox_ = closest_bbox;
         this->min_distance_ = min_distance;
-    }
-
+    }    
 };

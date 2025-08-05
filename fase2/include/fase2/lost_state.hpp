@@ -7,29 +7,35 @@
 #include "drone/Drone.hpp"
 #include "vision_fase2.hpp"
 
-class SearchBaseState : public fsm::State {
+class LostState : public fsm::State {
 public:
-    SearchBaseState() : fsm::State() {}
+    LostState() : fsm::State() {}
 
     void on_enter(fsm::Blackboard &blackboard) override {
         
         this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         this->vision = *blackboard.get<std::shared_ptr<VisionNode>>("vision");
         if(this->drone == nullptr || this->vision == nullptr) return;
-        drone->log("STATE: SEARCH BASE");
+
+        this->drone->log("");
+        this->drone->log("STATE: SEARCH BASE");
 
         this->waypoints = blackboard.get<std::vector<ArenaPoint>>("waypoints");
         this->bases = blackboard.get<std::vector<Base>>("bases");
+
+        this->print_counter = 0;
 
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
         this->initial_yaw = drone->getOrientation()[2];
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
         this->known_base_radius = *blackboard.get<float>("known_base_radius");
         this->height_to_ground = *blackboard.get<float>("height_to_ground");
+        this->mean_base_height = *blackboard.get<float>("mean_base_height");
     }
 
     std::string act(fsm::Blackboard &blackboard) override {
         (void)blackboard;
+        this->print_counter++;
 
         this->pos = this->drone->getLocalPosition();
         this->yaw = this->drone->getOrientation()[2];
@@ -39,33 +45,50 @@ public:
 
             for (const auto& bbox : bboxes) {
                 const Eigen::Vector2d approx_base = getApproximateBase(bbox);
-                drone->log("Estimate: {" + std::to_string(approx_base.x()) + ", " + std::to_string(approx_base.y()) + "}");
-
-                // Publish base detection to telemetry
-                this->vision->publishBaseDetection(approx_base, "detected_base", 0.8, 0);
-
                 bool is_known_base = false;
+                float min_horizontal_distance = std::numeric_limits<float>::max();
+                
+                // Publish base detection to telemetry
+                this->vision->publishBaseDetection("detected_base", approx_base, -this->mean_base_height); 
+                
+                if (this->print_counter % 5 == 0) {
+                    this->drone->log("");
+                    this->drone->log("Estimate: {" + std::to_string(approx_base.x()) + ", " + std::to_string(approx_base.y()) + "}");
+                }
+
                 for (const auto& base : *this->bases) {
                     float horizontal_distance = (approx_base - base.coordinates.head<2>()).norm();
-                    drone->log("Dist " + std::to_string(horizontal_distance) + " to {" 
-                                + std::to_string(base.coordinates[0]) + ", " + std::to_string(base.coordinates[1]) + "}");
+
+                    min_horizontal_distance = std::min(min_horizontal_distance, horizontal_distance);
+                    
+                    if (this->print_counter % 5 == 0) {
+                    }
+                    
                     if (horizontal_distance < this->known_base_radius) {
-                        drone->log("Known base!");
+                        if (this->print_counter % 5 == 0) {
+                            std::string base_index = std::to_string(&base - &(*this->bases)[0]);
+                            this->drone->log("Dist " + std::to_string(horizontal_distance) + " to Base {" + base_index + "}: {"
+                                        + std::to_string(base.coordinates[0]) + ", " + std::to_string(base.coordinates[1]) + "}");
+                            this->drone->log("Known base!");
+                        }
                         is_known_base = true;
                         break;
                     }
                 }
 
                 if (!is_known_base) {
-                    // Publish new base detection to telemetry
-                    this->vision->publishBaseDetection(approx_base, "new_base", 0.9, 0);
+                    this->drone->log("");
+                    this->drone->log("New base at: {" + std::to_string(approx_base.x()) + ", " + std::to_string(approx_base.y()) + "}");
+                    this->drone->log("Min distance to known base: " + std::to_string(min_horizontal_distance));
+                    
+                    // Publish first detection as yellow marker
+                    this->vision->publishBaseDetection("first_estimate_base", approx_base, -this->mean_base_height); 
                     
                     blackboard.set<Eigen::Vector2d>("approximate_base", approx_base);
                     return "BASE FOUND";
                 }
-            }                
-
-        }
+            }
+        } 
 
         auto goal_point = this->getNextPoint(this->waypoints);
         if(goal_point == nullptr) return "SEARCH ENDED";
@@ -75,6 +98,7 @@ public:
 
         if (goal_diff.norm() < this->position_tolerance) {
             goal_point->is_visited = true;
+            this->drone->log("");
             this->drone->log("Ponto visitado: {" + std::to_string(pos.x()) + ", "
                             + std::to_string(pos.y()) + ", " + std::to_string(pos.z()) + "}");
             return ""; 
@@ -109,8 +133,11 @@ private:
     float position_tolerance;
     float max_velocity;
 
+    int print_counter;
+
     float known_base_radius;
     float height_to_ground;
+    float mean_base_height;
 
     Eigen::Vector3d pos;
     
@@ -130,10 +157,10 @@ private:
         double bbox_x = bbox.center_x;
         double bbox_y = bbox.center_y;
 
-        // Assuming base is at 0.75m above the ground
-        double height = -this->pos.z() - 0.75;
+        // Assuming base is at mean_base_height (positive value) above the ground
+        double height = -this->pos.z() - this->mean_base_height;
 
-        // height_to_ground: distance seen in image (from left to right) when camera is at 1m distance from the ground.
+        // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).
         double k = std::atan(this->height_to_ground / 2);
 
         // Yolo coordinates: x -> left to right, y -> top to bottom

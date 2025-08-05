@@ -5,15 +5,21 @@
 #include "fsm/fsm.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include "drone/Drone.hpp"
-#include "fase2/vision_fase2.hpp"
 
+#include "fase2/align_base_state.hpp"
+#include "fase2/align_package_state.hpp"
+#include "fase2/approach_package_state.hpp"
+#include "fase2/ArenaPoint.hpp"
+#include "fase2/Base.hpp"
+#include "fase2/garra_state.hpp"
+#include "fase2/goto_delivery_state.hpp"
+#include "fase2/goto_package_state.hpp"
 #include "fase2/initial_takeoff_state.hpp"
-#include "fase2/search_base_state.hpp"
-#include "fase2/goto_base_state.hpp"
-#include "fase2/precision_align_state.hpp"
 #include "fase2/landing_state.hpp"
+#include "fase2/lost_state.hpp"
 #include "fase2/return_home_state.hpp"
 #include "fase2/takeoff_state.hpp"
+#include "fase2/vision_fase2.hpp"
 
 
 class Fase2FSM : public fsm::FSM {
@@ -36,59 +42,118 @@ public:
             }
         }
         
-        
+        // DYNAMIC GRID ----------------------------------------------------
+
         float takeoff_height = *this->blackboard_get<float>("takeoff_height");
+        float home_x = *this->blackboard_get<float>("fictual_home_x");
+        float home_y = *this->blackboard_get<float>("fictual_home_y");
+        float y_length = *this->blackboard_get<float>("grid_y_length");
+        float step_x = *this->blackboard_get<float>("grid_step_x");
+        float num_steps = *this->blackboard_get<float>("grid_num_steps");
+
+        int state = 0;
+        int num_steps_taken = 0;
+        bool finished = false;
+        float x_coord = home_x;
+        float y_coord = home_y;
 
         std::vector<ArenaPoint> waypoints;
-        waypoints.push_back({Eigen::Vector3d({1.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({3.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({3.0, -1.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({5.0, -1.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({5.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({6.0, -7.0, takeoff_height})});
-        waypoints.push_back({Eigen::Vector3d({6.0, -1.0, takeoff_height})});
+        while (num_steps_taken < num_steps || !finished) {
+            if (state % 4 == 0) {
+                // Go left
+                y_coord = home_y + y_length;
+                finished = true;
+            } else if (state % 4 == 1 || state % 4 == 3) {
+                // Go front
+                x_coord += step_x;
+                num_steps_taken++;
+                finished = false;
+            } else {
+                // Go right
+                y_coord = home_y;
+                finished = true;
+            }
+            state++;
+            waypoints.push_back({Eigen::Vector3d({x_coord, y_coord, takeoff_height})});
+        }
         this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
         this->blackboard_set<bool>("finished_bases", false);
 
+        // ------------------------------------------------------------------
+
+
+        // STATE MACHINE ----------------------------------------------------
+
+        // GET PACKAGE--------
 
         this->add_state("INITIAL TAKEOFF", std::make_unique<InitialTakeoffState>());
-        this->add_state("SEARCH BASE", std::make_unique<SearchBaseState>());
-        this->add_state("GO TO BASE", std::make_unique<GoToBaseState>());
-        this->add_state("PRECISION ALIGN", std::make_unique<PrecisionAlignState>());
-        this->add_state("PRECISION LANDING", std::make_unique<LandingState>());
-        this->add_state("RETURN HOME", std::make_unique<ReturnHomeState>());
+        this->add_state("GO TO PACKAGE", std::make_unique<GoToPackageState>());
+        this->add_state("ALIGN BASE", std::make_unique<AlignBaseState>());
+        this->add_state("APPROACH PACKAGE", std::make_unique<ApproachPackageState>());
+        this->add_state("ALIGN PACKAGE", std::make_unique<AlignBaseState>());
+        this->add_state("GARRA", std::make_unique<GarraState>());
         this->add_state("TAKEOFF", std::make_unique<TakeoffState>());
 
+        // DELIVER PACKAGE------
+
+        this->add_state("GO TO DELIVERY", std::make_unique<GoToDeliveryState>());
+        // ALIGN BASE
+        this->add_state("LANDING", std::make_unique<LandingState>());
+        // GARRA
+        // TAKEOFF
+
+        // FINISH--------------
+        this->add_state("RETURN HOME", std::make_unique<ReturnHomeState>());
+
+        // FALLBACK IF DETECTIONS ARE LOST
+        this->add_state("LOST", std::make_unique<LostState>());
+
+
         this->add_transitions("INITIAL TAKEOFF", {
-            {"INITIAL TAKEOFF COMPLETED", "SEARCH BASE"},
+            {"INITIAL TAKEOFF COMPLETED", "GO TO PACKAGE"},
             {"SEG FAULT", "ERROR"}
         });
 
-        this->add_transitions("SEARCH BASE", {
-            {"BASE FOUND", "GO TO BASE"},
-            {"SEARCH ENDED", "RETURN HOME"},
+        this->add_transitions("GO TO PACKAGE", {
+            {"OVER THE BASE", "ALIGN BASE"},
             {"SEG FAULT", "ERROR"}
         });
 
-        this->add_transitions("GO TO BASE", {
-            {"OVER THE BASE", "PRECISION ALIGN"},
+        this->add_transitions("ALIGN BASE", {
+            // GETTING PACKAGE
+            {"APPROACH PACKAGE", "APPROACH PACKAGE"},
+            {"LOST PACKAGE BASE", "LOST"},
+            // DELIVERING PACKAGE
+            {"LAND", "LANDING"},
+            {"LOST DELIVERY BASE", "LOST"},
             {"SEG FAULT", "ERROR"}
         });
 
-        this->add_transitions("PRECISION ALIGN", {
-            {"PRECISELY ALIGNED", "PRECISION LANDING"},
-            {"LOST BASE", "SEARCH BASE"},
+        this->add_transitions("APPROACH PACKAGE", {
+            {"APPROACH COMPLETE", "ALIGN PACKAGE"},
             {"SEG FAULT", "ERROR"}
         });
 
-        this->add_transitions("PRECISION LANDING", {
-            {"LANDED", "TAKEOFF"},
+        this->add_transitions("ALIGN PACKAGE", {
+            {"AT PACKAGE", "GARRA"},
+            {"LOST PACKAGE", "LOST"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("GARRA", {
+            {"GARRA MOVEMENT COMPLETE", "TAKEOFF"},
             {"SEG FAULT", "ERROR"}
         });
 
         this->add_transitions("TAKEOFF", {
-            {"NEXT BASE", "SEARCH BASE"},
-            {"FINISHED BASES", "RETURN HOME"},
+            {"DELIVER PACKAGE", "GO TO DELIVERY"},
+            {"GET NEXT PACKAGE", "GO TO PACKAGE"},
+            {"FINISHED PACKAGES", "RETURN HOME"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("GO TO DELIVERY", {
+            {"AT DELIVERY BASE", "ALIGN BASE"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -96,6 +161,13 @@ public:
             {"AT HOME", "FINISHED"},
             {"SEG FAULT", "ERROR"}
         });
+
+        this->add_transitions("LOST", {
+            {"FOUND PACKAGE BASE", "ALIGN BASE"},
+            {"FOUND DELIVERY BASE", "ALIGN BASE"}, 
+            {"FOUND PACKAGE", "ALIGN PACKAGE"}
+        });
+
     }
 
 };
@@ -112,6 +184,10 @@ public:
             {"fictual_home_y", -0.75},
             {"fictual_home_z", 0.6},
 
+            {"grid_y_length", -6.0},
+            {"grid_step_x", 2.0},
+            {"grid_num_steps", 3.0},
+
             {"takeoff_height", -2.0},
             {"max_vertical_velocity", 1.5},
             {"max_horizontal_velocity", 1.0},
@@ -126,9 +202,11 @@ public:
 
             {"known_base_radius", 1.7},
             {"height_to_ground", 1.0},
+            {"mean_base_height", 0.75},
             {"detection_timeout", 10.0},
             {"align_tolerance", 0.05},
-            {"landing_timeout", 8.0}
+            {"landing_timeout", 8.0},
+            {"landing_velocity", 0.5}
         };
         
         auto params = declareAndGetParameters(default_params);

@@ -12,6 +12,8 @@ public:
     void on_enter(fsm::Blackboard &blackboard) override {
         this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if (this->drone == nullptr) return;
+
+        this->drone->log("");
         this->drone->log("STATE: RETURN HOME");
 
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
@@ -19,7 +21,7 @@ public:
         this->takeoff_height = *blackboard.get<float>("takeoff_height");
 
         auto home_pos = *blackboard.get<Eigen::Vector3d>("home_position");
-        this->initial_yaw = *blackboard.get<float>("initial_yaw");
+        this->initial_yaw = this->drone->getOrientation()[2];
 
         this->goal = Eigen::Vector3d(
             home_pos.x(),

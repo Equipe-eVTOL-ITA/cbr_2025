@@ -11,31 +11,34 @@ public:
 
     void on_enter(fsm::Blackboard &blackboard) override {
 
-        drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
-        if (drone == nullptr) return;
-        drone->log("STATE: TAKEOFF");
-
-        std::vector<Base> bases;
-        bases.push_back({drone->getLocalPosition(), true});
-        blackboard.set<std::vector<Base>>("bases", bases);
+        this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
+        if (this->drone == nullptr) return;
+        
+        this->drone->log("");
+        this->drone->log("STATE: TAKEOFF");
 
 
         this->max_velocity = *blackboard.get<float>("max_vertical_velocity");
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
         float takeoff_height = *blackboard.get<float>("takeoff_height");
 
-        this->print_counter = 0;
-
-        this->pos = drone->getLocalPosition();
-        this->initial_yaw = drone->getOrientation()[2];
+        this->pos = this->drone->getLocalPosition();
+        this->initial_yaw = this->drone->getOrientation()[2];
         this->goal = Eigen::Vector3d({this->pos[0], this->pos[1], takeoff_height});
-        bool finished_bases = *blackboard.get<bool>("finished_bases");
 
+        
+        bool finished_bases = *blackboard.get<bool>("finished_bases");
         this->return_statement = finished_bases ? "FINISHED BASES" : "NEXT BASE";
 
-        drone->log("Initial Yaw: " + std::to_string(initial_yaw));
-        drone->log("Takeoff at: " + std::to_string(pos[0])
-                    + " " + std::to_string(pos[1]) + " " + std::to_string(pos[2]));
+        if (this->drone->getArmingState() != DronePX4::ARMING_STATE::ARMED) {
+            this->drone->toOffboardSync();
+            this->drone->armSync();
+        }
+        
+        this->print_counter = 0;
+        // this->drone->log("Initial Yaw: " + std::to_string(initial_yaw));
+        // this->drone->log("Takeoff at: " + std::to_string(pos[0])
+                    // + " " + std::to_string(pos[1]) + " " + std::to_string(pos[2]));
 
     }
 
@@ -43,22 +46,22 @@ public:
         (void)blackboard;
         
         if (this->print_counter%10==0){
-            drone->log("Pos: {" + std::to_string(this->pos[0]) + ", " 
+            this->drone->log("Pos: {" + std::to_string(this->pos[0]) + ", " 
             + std::to_string(this->pos[1]) + ", " + std::to_string(this->pos[2]) + "}");
         }
         this->print_counter++;
         
-        this->pos = drone->getLocalPosition();
+        this->pos = this->drone->getLocalPosition();
         Eigen::Vector3d diff = this->goal - this->pos;
 
         if (diff.norm() < this->position_tolerance) {
-            return "TAKEOFF COMPLETED";
+            return this->return_statement;
         }
 
         Eigen::Vector3d little_goal = pos + (diff.norm() > max_velocity ?
                                             diff.normalized() * max_velocity : diff);
         
-        drone->setLocalPosition(
+        this->drone->setLocalPosition(
             little_goal.x(),
             little_goal.y(),
             little_goal.z(),

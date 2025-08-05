@@ -5,13 +5,15 @@
 #include "vision_fase2.hpp"
 
 
-class GoToBaseState : public fsm::State {
+class GoToDeliveryState : public fsm::State {
 public:
-    GoToBaseState() : fsm::State() {}
+    GoToDeliveryState() : fsm::State() {}
 
     void on_enter(fsm::Blackboard &blackboard) override {
         this->drone = *blackboard.get<std::shared_ptr<Drone>>("drone");
         if(this->drone == nullptr) return;
+
+        this->drone->log("");
         this->drone->log("STATE: GO TO BASE");
 
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
