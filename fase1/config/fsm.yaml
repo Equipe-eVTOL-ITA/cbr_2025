@@ -1,7 +1,7 @@
 fase1_fsm:
   ros__parameters:
     fictual_home_x: 1.0
-    fictual_home_y: -0.75
+    fictual_home_y: -1.0
     fictual_home_z: -0.6 # Remember z points Down
 
     # Dynamic grid parameters
