@@ -88,7 +88,6 @@ class TelemetryDashboardNode(Node):
             
     def _logs_callback(self, msg: LogMessage):
         """Handle log messages."""
-        self.network_metrics.record_topic_message('/telemetry/logs')
         self.gui.add_log_message(msg)
         
     def _drone_status_callback(self, msg: DroneStatus):

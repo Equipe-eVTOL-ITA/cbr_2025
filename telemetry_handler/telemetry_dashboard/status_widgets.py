@@ -134,6 +134,7 @@ class StatusPanel:
         self.cpu_percent_var = tk.StringVar(value="N/A")
         self.memory_percent_var = tk.StringVar(value="N/A")
         self.disk_percent_var = tk.StringVar(value="N/A")
+        self.gpu_percent_var = tk.StringVar(value="N/A")
         self.temperature_var = tk.StringVar(value="N/A")
         self.last_health_update_var = tk.StringVar(value="Never")
         
@@ -142,6 +143,11 @@ class StatusPanel:
         ttk.Label(frame, text="CPU Usage:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.cpu_label = ttk.Label(frame, textvariable=self.cpu_percent_var, font=('TkDefaultFont', 10, 'bold'))
         self.cpu_label.grid(row=row, column=1, sticky=tk.W, pady=2, padx=(10, 0))
+        
+        row += 1
+        ttk.Label(frame, text="GPU Usage:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.gpu_label = ttk.Label(frame, textvariable=self.gpu_percent_var, font=('TkDefaultFont', 10, 'bold'))
+        self.gpu_label.grid(row=row, column=1, sticky=tk.W, pady=2, padx=(10, 0))
         
         row += 1
         ttk.Label(frame, text="Memory Usage:").grid(row=row, column=0, sticky=tk.W, pady=2)
@@ -294,6 +300,15 @@ class StatusPanel:
         self.cpu_percent_var.set(f"{msg.cpu_percent:.1f}%")
         cpu_color = "red" if msg.cpu_percent > 90 else "orange" if msg.cpu_percent > 70 else "green"
         self.cpu_label.configure(foreground=cpu_color)
+        
+        # GPU
+        if hasattr(msg, 'gpu_percent'):
+            self.gpu_percent_var.set(f"{msg.gpu_percent:.1f}%")
+            gpu_color = "red" if msg.gpu_percent > 90 else "orange" if msg.gpu_percent > 70 else "green"
+            self.gpu_label.configure(foreground=gpu_color)
+        else:
+            self.gpu_percent_var.set("N/A")
+            self.gpu_label.configure(foreground="gray")
         
         # Memory
         self.memory_percent_var.set(f"{msg.memory_percent:.1f}%")

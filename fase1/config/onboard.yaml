@@ -46,14 +46,10 @@ base_detector:
     yellow_upper_v: 255
     
     # Detection constraints for combined regions
-    combined_min_area: 0.04
-    combined_max_area: 1.0
+    combined_min_area: 0.03
+    combined_max_area: 1.1
     combined_aspect_ratio_min: 0.5
     combined_aspect_ratio_max: 2.0
-    
-    # Detection tracking parameters
-    detection_distance_threshold: 0.05
-    detection_timeout: 2.0  # Seconds
     
     # Dilation parameters for combining adjacent color regions
     combination_kernel_size: 15
@@ -61,7 +57,11 @@ base_detector:
 
 telemetry_recorder:
   ros__parameters:
-    enable: true
-    max_duration_minutes: 10
-    max_file_size_mb: 1000
-    output_directory: "~/frtl_2025_ws/flight_logs/onboard"
+    recording:
+      enable: false
+      max_duration_minutes: 10
+      max_file_size_mb: 1000
+      include_images: false
+      recording_formats: ["rosbag"]
+      output_directory: "~/frtl_2025_ws/flight_logs/onboard"
+      autosave_time: 300.0  # Auto-save every 5 minutes

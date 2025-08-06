@@ -17,6 +17,12 @@ private:
     float getMemoryUsage();
     float getCpuTemperature();
     float getDiskUsage();
+    float getGpuUsage();
+    
+    // GPU-specific methods
+    float getNvidiaGpuUsage();
+    float getIntelGpuUsage();
+    float getAmdGpuUsage();
     
     rclcpp::Publisher<custom_msgs::msg::SystemHealth>::SharedPtr system_health_pub_;
     rclcpp::TimerBase::SharedPtr health_timer_;

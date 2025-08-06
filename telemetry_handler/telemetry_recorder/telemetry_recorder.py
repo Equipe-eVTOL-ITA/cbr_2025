@@ -10,6 +10,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 import json
 import csv
 import os
+import signal
+import sys
 from datetime import datetime
 from typing import Dict, Any, Optional
 import threading
@@ -45,6 +47,7 @@ class TelemetryRecorder(Node):
                 ('recording.output_directory', '~/frtl_2025_ws/flight_logs'),
                 ('recording.recording_formats', ['rosbag', 'csv']),
                 ('recording.include_images', False),
+                ('recording.autosave_time', 300.0),  # Auto-save every 5 minutes by default
                 ('topics.position', '/telemetry/position'),
                 ('topics.bases', '/telemetry/bases'),
                 ('topics.logs', '/telemetry/logs'),
@@ -62,6 +65,7 @@ class TelemetryRecorder(Node):
         self.output_dir = os.path.expanduser(str(output_dir_param)) if output_dir_param else '/tmp/telemetry_logs'
         self.formats = self.get_parameter('recording.recording_formats').value
         self.include_images = self.get_parameter('recording.include_images').value
+        self.autosave_time = self.get_parameter('recording.autosave_time').value
         
         # Topic names
         self.topics = {
@@ -79,6 +83,7 @@ class TelemetryRecorder(Node):
         self.current_session_id = None
         self.recorded_messages = 0
         self.current_file_size = 0
+        self.shutdown_requested = False
         
         # Data storage for CSV/JSON export
         self.recorded_data: Dict[str, list] = {
@@ -94,6 +99,10 @@ class TelemetryRecorder(Node):
         
         # Create output directory
         os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Setup signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
         
         # Setup QoS
         self.position_qos = QoSProfile(
@@ -136,11 +145,70 @@ class TelemetryRecorder(Node):
         # Recording timer for duration limits
         self.recording_timer = None
         
+        # Auto-save timer for periodic saves
+        self.autosave_timer = None
+        
         # Start recording if auto-start is enabled
         if self.recording_enabled:
             self.start_recording()
             
         self.get_logger().info(f"TelemetryRecorder initialized, output dir: {self.output_dir}")
+        
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully."""
+        self.get_logger().info(f"Received signal {signum}, initiating graceful shutdown...")
+        self.shutdown_requested = True
+        
+        # Save data immediately if recording
+        if self.is_recording:
+            self.get_logger().info("Saving recording data before shutdown...")
+            self.stop_recording()
+        
+        # Signal the writer thread to stop
+        self.write_queue.put(("SHUTDOWN", None))
+        
+    def _autosave_callback(self):
+        """Periodic auto-save of data while recording."""
+        if not self.is_recording:
+            return
+            
+        try:
+            # Save current data without stopping recording
+            self._save_csv_data()
+            self._save_json_data()
+            
+            self.get_logger().info(
+                f"Auto-saved telemetry data - Session: {self.current_session_id}, "
+                f"Messages: {self.recorded_messages}"
+            )
+        except Exception as e:
+            self.get_logger().error(f"Error during auto-save: {e}")
+            
+    def cleanup(self):
+        """Cleanup resources before shutdown."""
+        self.get_logger().info("Cleaning up telemetry recorder...")
+        
+        # Stop recording if active
+        if self.is_recording:
+            self.stop_recording()
+            
+        # Cancel timers
+        if self.recording_timer:
+            self.recording_timer.cancel()
+            self.recording_timer = None
+            
+        if self.autosave_timer:
+            self.autosave_timer.cancel()
+            self.autosave_timer = None
+            
+        # Signal writer thread to stop
+        self.write_queue.put(("SHUTDOWN", None))
+        
+        # Wait for writer thread to finish
+        if hasattr(self, 'writer_thread') and self.writer_thread.is_alive():
+            self.writer_thread.join(timeout=2.0)
+            
+        self.get_logger().info("Telemetry recorder cleanup complete")
         
     def _setup_rosbag(self):
         """Setup rosbag writer if available."""
@@ -251,6 +319,13 @@ class TelemetryRecorder(Node):
                 self._stop_recording_timeout
             )
             
+        # Set auto-save timer if enabled
+        if self.autosave_time > 0:
+            self.autosave_timer = self.create_timer(
+                self.autosave_time,
+                self._autosave_callback
+            )
+            
         self.get_logger().info(f"Started recording session: {session_id}")
         return True
         
@@ -262,10 +337,14 @@ class TelemetryRecorder(Node):
             
         self.is_recording = False
         
-        # Cancel timer
+        # Cancel timers
         if self.recording_timer:
             self.recording_timer.cancel()
             self.recording_timer = None
+            
+        if self.autosave_timer:
+            self.autosave_timer.cancel()
+            self.autosave_timer = None
             
         # Close rosbag
         if self.rosbag_writer:
@@ -309,10 +388,15 @@ class TelemetryRecorder(Node):
         
     def _data_writer_loop(self):
         """Background thread for writing data."""
-        while True:
+        while not self.shutdown_requested:
             try:
                 # Get data from queue (blocking)
                 topic_type, msg = self.write_queue.get(timeout=1.0)
+                
+                # Check for shutdown signal
+                if topic_type == "SHUTDOWN":
+                    self.get_logger().info("Writer thread received shutdown signal")
+                    break
                 
                 if not self.is_recording:
                     continue
@@ -332,6 +416,8 @@ class TelemetryRecorder(Node):
                 continue  # Normal timeout, keep checking
             except Exception as e:
                 self.get_logger().error(f"Error in data writer: {e}")
+                
+        self.get_logger().info("Data writer thread shutting down")
                 
     def _create_rosbag_topics(self):
         """Create topics in rosbag."""
@@ -360,9 +446,16 @@ class TelemetryRecorder(Node):
             return
             
         try:
+            from rclpy.serialization import serialize_message
+            
             topic_name = self.topics[topic_type]
             timestamp = self.get_clock().now().nanoseconds
-            self.rosbag_writer.write(topic_name, msg, timestamp)
+            
+            # Serialize the message to CDR format
+            serialized_msg = serialize_message(msg)
+            
+            # Write serialized message to rosbag
+            self.rosbag_writer.write(topic_name, serialized_msg, timestamp)
         except Exception as e:
             self.get_logger().error(f"Error writing to rosbag: {e}")
             
@@ -451,15 +544,36 @@ def main(args=None):
     """Main entry point."""
     rclpy.init(args=args)
     
+    node = None
     try:
         node = TelemetryRecorder()
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        # Stop recording on shutdown
-        if hasattr(node, 'is_recording') and node.is_recording:
-            node.stop_recording()
+        
+        # Handle shutdown gracefully
+        try:
+            rclpy.spin(node)
+        except KeyboardInterrupt:
+            node.get_logger().info("Keyboard interrupt received")
+        
+    except Exception as e:
+        if node:
+            node.get_logger().error(f"Unhandled exception in main: {e}")
+        else:
+            print(f"Error creating TelemetryRecorder node: {e}")
+            
     finally:
-        rclpy.shutdown()
+        # Always cleanup, regardless of how we got here
+        if node:
+            try:
+                node.cleanup()
+            except Exception as e:
+                print(f"Error during cleanup: {e}")
+            finally:
+                node.destroy_node()
+        
+        try:
+            rclpy.shutdown()
+        except Exception as e:
+            print(f"Error during rclpy shutdown: {e}")
 
 
 if __name__ == '__main__':

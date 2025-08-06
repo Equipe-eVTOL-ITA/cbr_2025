@@ -36,7 +36,6 @@ class NetworkMetrics:
         '/telemetry/position': 20.0,      # 20Hz
         '/telemetry/drone_status': 2.0,   # 2Hz  
         '/telemetry/system_health': 1.0,  # 1Hz
-        '/telemetry/logs': 10.0,          # Up to 10Hz (variable)
     }
     
     def __init__(self, ping_target: str = "192.168.0.152", ground_station_ip: str = "192.168.0.100"):

@@ -61,7 +61,9 @@ base_detector:
 
 telemetry_recorder:
   ros__parameters:
-    enable: true
-    max_duration_minutes: 10
-    max_file_size_mb: 1000
-    output_directory: "~/frtl_2025_ws/flight_logs/onboard"
+    recording:
+      enable: true
+      max_duration_minutes: 10
+      max_file_size_mb: 1000
+      output_directory: "~/frtl_2025_ws/flight_logs/onboard"
+      autosave_time: 300.0  # Auto-save every 5 minutes

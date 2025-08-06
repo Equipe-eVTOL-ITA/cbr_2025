@@ -8,10 +8,12 @@ telemetry_handler:
 
 telemetry_recorder:
   ros__parameters:
-    enable: true
-    max_duration_minutes: 10
-    max_file_size_mb: 1000
-    output_directory: "~/frtl_2025_ws/flight_logs/ground_station"
+    recording:
+      enable: true
+      max_duration_minutes: 10
+      max_file_size_mb: 1000
+      output_directory: "~/frtl_2025_ws/flight_logs/ground_station"
+      autosave_time: 180.0  # Auto-save every 3 minutes
 
 telemetry_dashboard:
   ros__parameters:

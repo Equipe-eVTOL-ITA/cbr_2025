@@ -1,6 +1,8 @@
 #include "drone/SystemHealth.hpp"
 #include <sstream>
 #include <cstdio>
+#include <chrono>
+#include <algorithm>
 
 SystemHealth::SystemHealth() : Node("system_health") {
     // Create publisher for system health telemetry
@@ -23,21 +25,47 @@ void SystemHealth::publishSystemHealth() {
     msg.memory_percent = getMemoryUsage();
     msg.temperature = getCpuTemperature();
     msg.disk_usage_percent = getDiskUsage();
+    msg.gpu_percent = getGpuUsage();
     
     system_health_pub_->publish(msg);
 }
 
 float SystemHealth::getCpuUsage() {
-    // Simple CPU usage approximation using load average
-    std::ifstream file("/proc/loadavg");
+    // Read CPU stats from /proc/stat for accurate CPU usage calculation
+    static unsigned long long prev_idle = 0, prev_total = 0;
+    
+    std::ifstream file("/proc/stat");
     if (!file.is_open()) return 0.0f;
     
-    float load;
-    file >> load;
+    std::string line;
+    std::getline(file, line);
     file.close();
     
-    // Convert load average to approximate percentage (assuming single core baseline)
-    return std::min(load * 100.0f, 100.0f);
+    // Parse CPU line: cpu user nice system idle iowait irq softirq steal guest guest_nice
+    std::istringstream iss(line);
+    std::string cpu_label;
+    unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
+    
+    iss >> cpu_label >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
+    
+    // Calculate total and idle time
+    unsigned long long total = user + nice + system + idle + iowait + irq + softirq + steal;
+    unsigned long long current_idle = idle + iowait;
+    
+    // Calculate differences
+    unsigned long long total_diff = total - prev_total;
+    unsigned long long idle_diff = current_idle - prev_idle;
+    
+    float cpu_percent = 0.0f;
+    if (total_diff > 0) {
+        cpu_percent = 100.0f * (1.0f - (float)idle_diff / (float)total_diff);
+    }
+    
+    // Update previous values for next calculation
+    prev_total = total;
+    prev_idle = current_idle;
+    
+    return std::max(0.0f, std::min(100.0f, cpu_percent));
 }
 
 float SystemHealth::getMemoryUsage() {
@@ -64,15 +92,46 @@ float SystemHealth::getMemoryUsage() {
 }
 
 float SystemHealth::getCpuTemperature() {
-    std::ifstream file("/sys/class/thermal/thermal_zone0/temp");
-    if (!file.is_open()) return 0.0f;
+    // Try multiple temperature sources in order of preference
+    std::vector<std::string> temp_paths = {
+        "/sys/class/thermal/thermal_zone0/temp",  // Common CPU thermal zone
+        "/sys/class/thermal/thermal_zone1/temp",  // Alternative CPU thermal zone
+        "/sys/class/hwmon/hwmon0/temp1_input",    // Hardware monitoring
+        "/sys/class/hwmon/hwmon1/temp1_input",    // Alternative hwmon
+        "/sys/class/hwmon/hwmon2/temp1_input"     // Another alternative
+    };
     
-    float temp;
-    file >> temp;
-    file.close();
+    for (const auto& path : temp_paths) {
+        std::ifstream file(path);
+        if (file.is_open()) {
+            float temp;
+            if (file >> temp) {
+                file.close();
+                
+                // Convert from millidegrees to degrees Celsius
+                float celsius = temp / 1000.0f;
+                
+                // Sanity check: temperature should be between -40°C and 125°C
+                if (celsius >= -40.0f && celsius <= 125.0f) {
+                    return celsius;
+                }
+            }
+        }
+    }
     
-    // Convert from millidegrees to degrees Celsius
-    return temp / 1000.0f;
+    // If all thermal zones fail, try reading CPU package temperature
+    std::ifstream coretemp("/sys/devices/platform/coretemp.0/hwmon/hwmon*/temp*_input");
+    if (coretemp.is_open()) {
+        float temp;
+        if (coretemp >> temp) {
+            float celsius = temp / 1000.0f;
+            if (celsius >= -40.0f && celsius <= 125.0f) {
+                return celsius;
+            }
+        }
+    }
+    
+    return 0.0f; // No valid temperature found
 }
 
 float SystemHealth::getDiskUsage() {
@@ -86,6 +145,104 @@ float SystemHealth::getDiskUsage() {
         return ((float)(total - free) / total) * 100.0f;
     }
     return 0.0f;
+}
+
+float SystemHealth::getGpuUsage() {
+    // Try multiple methods to get GPU usage
+    
+    // Method 1: Try NVIDIA GPU via nvidia-smi
+    float nvidia_usage = getNvidiaGpuUsage();
+    if (nvidia_usage >= 0.0f) {
+        return nvidia_usage;
+    }
+    
+    // Method 2: Try Intel GPU via intel_gpu_top (common on Intel systems)
+    float intel_usage = getIntelGpuUsage();
+    if (intel_usage >= 0.0f) {
+        return intel_usage;
+    }
+    
+    // Method 3: Try AMD GPU via radeontop
+    float amd_usage = getAmdGpuUsage();
+    if (amd_usage >= 0.0f) {
+        return amd_usage;
+    }
+    
+    // No GPU detected or supported
+    return 0.0f;
+}
+
+float SystemHealth::getNvidiaGpuUsage() {
+    // Use nvidia-smi to get GPU utilization
+    FILE* pipe = popen("nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null", "r");
+    if (!pipe) return -1.0f;
+    
+    char buffer[128];
+    std::string result = "";
+    while (fgets(buffer, sizeof buffer, pipe) != nullptr) {
+        result += buffer;
+    }
+    pclose(pipe);
+    
+    if (result.empty()) return -1.0f;
+    
+    try {
+        return std::stof(result);
+    } catch (...) {
+        return -1.0f;
+    }
+}
+
+float SystemHealth::getIntelGpuUsage() {
+    // Check for Intel GPU usage via /sys/class/drm/card*/engine/*/busy
+    std::ifstream file("/sys/class/drm/card0/engine/rcs0/busy");
+    if (!file.is_open()) {
+        // Try alternative path
+        file.open("/sys/class/drm/card1/engine/rcs0/busy");
+        if (!file.is_open()) return -1.0f;
+    }
+    
+    unsigned long long busy_time;
+    file >> busy_time;
+    file.close();
+    
+    // This is a simplified approach - busy time accumulates, so we need to calculate percentage
+    // For now, return a basic indication (would need proper time-based calculation)
+    static unsigned long long prev_busy = 0;
+    static auto prev_time = std::chrono::steady_clock::now();
+    
+    auto current_time = std::chrono::steady_clock::now();
+    auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - prev_time).count();
+    
+    if (time_diff > 100 && prev_busy > 0) { // Only calculate after some time has passed
+        unsigned long long busy_diff = busy_time - prev_busy;
+        float usage = (float)busy_diff / (time_diff * 1000.0f) * 100.0f; // Rough estimation
+        
+        prev_busy = busy_time;
+        prev_time = current_time;
+        
+        return std::min(100.0f, usage);
+    }
+    
+    prev_busy = busy_time;
+    prev_time = current_time;
+    return 0.0f;
+}
+
+float SystemHealth::getAmdGpuUsage() {
+    // Try reading AMD GPU usage from sysfs
+    std::ifstream file("/sys/class/drm/card0/device/gpu_busy_percent");
+    if (!file.is_open()) {
+        // Try alternative path
+        file.open("/sys/class/drm/card1/device/gpu_busy_percent");
+        if (!file.is_open()) return -1.0f;
+    }
+    
+    float usage;
+    file >> usage;
+    file.close();
+    
+    return std::min(100.0f, std::max(0.0f, usage));
 }
 
 int main(int argc, char **argv) {
