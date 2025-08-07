@@ -11,7 +11,7 @@ fase1_fsm:
     grid_step_x: 2.0 # Step size in x direction
     grid_num_steps: 3.0 # Number of steps in x direction
 
-    takeoff_height: -3.0
+    takeoff_height: -2.5
     max_vertical_velocity: 1.2
     max_horizontal_velocity: 1.0
 
@@ -24,12 +24,12 @@ fase1_fsm:
     setpoint: 0.0
 
     known_base_radius: 1.5
-    height_to_ground: 1.2
+    height_to_ground: 0.65
     mean_base_height: 0.85 # Use positive values for this height
     detection_timeout: 10.0
     # -------------------------------------
-    align_tolerance: 0.025
-    landing_timeout: 7.0
+    align_tolerance: 0.04
+    landing_timeout: 9.0
     landing_velocity: 0.5 # Positive value
     
 

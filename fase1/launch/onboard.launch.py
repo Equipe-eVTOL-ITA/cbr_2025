@@ -68,7 +68,7 @@ def generate_launch_description():
         exec_arg,
         system_health_node,
         telemetry_recorder_node,        
-        # camera_node,
+        camera_node,
         base_detector_node,
         delayed_fsm_node
     ])
