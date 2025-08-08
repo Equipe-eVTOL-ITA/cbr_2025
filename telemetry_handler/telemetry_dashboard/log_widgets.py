@@ -36,9 +36,11 @@ class LogPanel:
         self.current_node_filter = ""
         self.auto_scroll_enabled = True
         
-        # Thread safety
+        # Thread safety and display coordination
         self._updating_display = False
         self._refresh_scheduled = False
+        self._pending_scroll = False    
+        self._last_scroll_position = None
         
         self._setup_log_panel()
         
@@ -169,6 +171,10 @@ class LogPanel:
     def _display_message(self, log_entry: dict):
         """Display a single log message in the text widget."""
         try:
+            # Store current scroll position before any updates
+            if not self.auto_scroll_enabled:
+                self._last_scroll_position = self.log_text.yview()
+            
             self.log_text.configure(state=tk.NORMAL)
             
             # Format timestamp
@@ -197,18 +203,37 @@ class LogPanel:
             self.log_text.insert(tk.END, log_entry['message'])
             self.log_text.insert(tk.END, "\n")
             
-            # Auto-scroll if enabled
+            self.log_text.configure(state=tk.DISABLED)
+            
+            # Handle scrolling after text is properly configured
             if self.auto_scroll_enabled:
-                self.log_text.see(tk.END)
+                self._schedule_auto_scroll()
+            elif self._last_scroll_position:
+                # Restore previous scroll position
+                self.log_text.yview_moveto(self._last_scroll_position[0])
                 
         except tk.TclError:
             # Widget might be destroyed, ignore
             pass
-        finally:
+
+    def _schedule_auto_scroll(self):
+        """Schedule auto-scroll with proper timing to prevent flickering."""
+        if self._pending_scroll:
+            return
+            
+        self._pending_scroll = True
+        
+        def do_scroll():
+            self._pending_scroll = False
             try:
-                self.log_text.configure(state=tk.DISABLED)
+                if self.auto_scroll_enabled and not self._updating_display:
+                    self.log_text.see(tk.END)
+                    self.log_text.update_idletasks()
             except tk.TclError:
                 pass
+                
+        # Use a minimal delay to ensure text widget is ready
+        self.parent.after(10, do_scroll)
         
     def _refresh_display(self):
         """Refresh the entire log display based on current filters."""
@@ -218,6 +243,11 @@ class LogPanel:
         self._updating_display = True
         
         try:
+            # Store scroll position if auto-scroll is disabled
+            scroll_position = None
+            if not self.auto_scroll_enabled:
+                scroll_position = self.log_text.yview()
+            
             # Clear current display
             self.log_text.configure(state=tk.NORMAL)
             self.log_text.delete(1.0, tk.END)
@@ -225,21 +255,21 @@ class LogPanel:
             # Re-display filtered messages
             for log_entry in self.log_messages:
                 if self._message_passes_filters(log_entry):
-                    # Use a simplified display method for batch refresh
                     self._display_message_batch(log_entry)
-                    
-            # Auto-scroll to end if enabled
+            
+            self.log_text.configure(state=tk.DISABLED)
+            
+            # Handle scrolling after all content is loaded
             if self.auto_scroll_enabled:
-                self.log_text.see(tk.END)
+                self._schedule_auto_scroll()
+            elif scroll_position:
+                # Restore previous scroll position
+                self.log_text.yview_moveto(scroll_position[0])
                 
         except tk.TclError:
             # Widget might be destroyed, ignore
             pass
         finally:
-            try:
-                self.log_text.configure(state=tk.DISABLED)
-            except tk.TclError:
-                pass
             self._updating_display = False
             
         self._update_statistics()
@@ -305,16 +335,10 @@ class LogPanel:
         """Handle auto scroll toggle."""
         self.auto_scroll_enabled = self.auto_scroll_var.get()
         if self.auto_scroll_enabled:
-            # Schedule autoscroll after a brief delay to prevent flicker
-            def delayed_scroll():
-                try:
-                    # Only scroll if we have content and aren't currently updating
-                    if not self._updating_display and self.log_text.get("1.0", tk.END).strip():
-                        self.log_text.see(tk.END)
-                except tk.TclError:
-                    pass
-            
-            self.parent.after(50, delayed_scroll)
+            # Clear any pending scroll operations
+            self._pending_scroll = False
+            # Schedule immediate scroll to end
+            self._schedule_auto_scroll()
             
     def _clear_logs(self):
         """Clear all log messages."""
