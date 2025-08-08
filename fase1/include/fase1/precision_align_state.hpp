@@ -24,7 +24,7 @@ public:
 
         this->align_tolerance = *blackboard.get<float>("align_tolerance");
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
-        this->takeoff_height = *blackboard.get<float>("takeoff_height");
+        this->align_descent_velocity = *blackboard.get<float>("align_descent_velocity");
         this->initial_yaw = this->drone->getOrientation()[2];
         this->detection_timeout = *blackboard.get<float>("detection_timeout");
         this->height_to_ground = *blackboard.get<float>("height_to_ground");
@@ -107,7 +107,7 @@ public:
             this->drone->log("Rates: x=" + std::to_string(rate.x()) + ", y=" + std::to_string(rate.y()));
         }
 
-        this->drone->setLocalVelocity(rate.x(), rate.y(), 0.0, 0.0);
+        this->drone->setLocalVelocity(rate.x(), rate.y(), this->align_descent_velocity, 0.0);
 
         return "";
     }
@@ -122,7 +122,7 @@ private:
     
     float align_tolerance;
     float max_velocity;
-    float takeoff_height;
+    float align_descent_velocity;
     float initial_yaw;
     float detection_timeout;
     float height_to_ground;

@@ -157,6 +157,7 @@ public:
             {"max_horizontal_velocity", 1.0},
             {"landing_velocity_max", 0.5},
             {"landing_velocity_min", 0.2},
+            {"align_descent_velocity", 0.15},
 
             {"max_search_time", 30.0},
             {"detection_timeout", 10.0},
