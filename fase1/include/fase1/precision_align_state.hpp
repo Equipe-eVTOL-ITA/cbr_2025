@@ -75,7 +75,7 @@ public:
             this->approx_offset = this->getApproximateOffset(bbox);
 
             auto approx_base = this->pos.head<2>() + this->approx_offset;
-            this->vision->publishBaseDetection("detected_base", approx_base, -this->mean_base_height); 
+            this->vision->publishBaseDetection("detected_base", approx_base, this->mean_base_height); 
             
 
             if (this->approx_offset.norm() < this->align_tolerance){
@@ -97,17 +97,22 @@ public:
         float x_rate = x_pid.compute(this->setpoint - this->approx_offset.x());
         float y_rate = y_pid.compute(this->setpoint - this->approx_offset.y());
 
-        // Limit velocity to max_velocity
+        // Limit horizontal velocity to max_velocity
         Eigen::Vector2d rate = Eigen::Vector2d({x_rate, y_rate});
         rate = rate.norm() > this->max_velocity ? 
                rate.normalized() * this->max_velocity : rate;
 
+        float z_rate = 0.0f;
+        if (this->approx_offset.norm() < 3 * this->align_tolerance) {
+            z_rate = this->align_descent_velocity;
+        }
         
         if (this->print_counter % 5 == 0 ){
-            this->drone->log("Rates: x=" + std::to_string(rate.x()) + ", y=" + std::to_string(rate.y()));
+            this->drone->log("Rates: x=" + std::to_string(rate.x()) +
+                             ", y=" + std::to_string(rate.y()) + ", z=" + std::to_string(z_rate));
         }
 
-        this->drone->setLocalVelocity(rate.x(), rate.y(), this->align_descent_velocity, 0.0);
+        this->drone->setLocalVelocity(rate.x(), rate.y(), z_rate, 0.0);
 
         return "";
     }
@@ -144,7 +149,8 @@ private:
 
         
         // Assuming base is at mean_base_height above the ground
-        double height = -this->pos.z() - this->mean_base_height;
+        // Converting to positive height value
+        double height = - (this->pos.z() - this->mean_base_height);
         
         // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).
         double k = std::atan(this->height_to_ground / 2);

@@ -106,7 +106,7 @@ public:
             {"takeoff_height", -2.5},
             {"align_height", -2.0},
             {"max_base_height", -1.5},
-            {"mean_base_height", 0.85},
+            {"mean_base_height", -0.85},
 
             {"max_vertical_velocity", 1.2},
             {"max_horizontal_velocity", 1.0},

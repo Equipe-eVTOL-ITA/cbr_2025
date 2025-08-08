@@ -6,17 +6,17 @@ fase1_fsm:
 
     num_bases: 6.0 # Bases to visit (excluding home)
     known_base_radius: 1.5
-    height_to_ground: 0.65
+    height_to_ground: 1.1 #0.65 on jetson
     
     # Dynamic grid parameters
     grid_y_length: -6.0 # Negative -> grid spawns to the left of home
     grid_step_x: 2.0 # Step size in x direction
     grid_num_steps: 3.0 # Number of steps in x direction
 
-    takeoff_height: -2.5
-    align_height: -2.0
+    takeoff_height: -3.5
+    align_height: -2.4
     max_base_height: -1.5
-    mean_base_height: 0.85 # Use positive values for this height
+    mean_base_height: -0.75
 
     max_vertical_velocity: 1.2
     max_horizontal_velocity: 1.0
@@ -27,7 +27,7 @@ fase1_fsm:
     max_search_time: 30.0
     detection_timeout: 10.0
 
-    position_tolerance: 0.07
+    position_tolerance: 0.05
     align_tolerance: 0.025
 
     pid_pos_kp: 1.0

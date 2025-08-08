@@ -9,7 +9,7 @@ telemetry_handler:
 telemetry_recorder:
   ros__parameters:
     recording:
-      enable: true
+      enable: false
       max_duration_minutes: 10
       max_file_size_mb: 1000
       include_images: false

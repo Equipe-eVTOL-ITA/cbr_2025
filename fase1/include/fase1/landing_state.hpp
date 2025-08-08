@@ -20,11 +20,10 @@ public:
 
         this->v_max = *blackboard.get<float>("landing_velocity_max");
         this->v_min = *blackboard.get<float>("landing_velocity_min");
-        float align_height = *blackboard.get<float>("align_height"); // Negative
-        float max_base_height = *blackboard.get<float>("max_base_height"); // Negative
+        float align_height = - *blackboard.get<float>("align_height"); // Negative
+        float max_base_height = - *blackboard.get<float>("max_base_height"); // Negative
 
-        //Minus because height is negative
-        this->time_constant = - (this->v_max - this->v_min) / (align_height - max_base_height);
+        this->time_constant = (this->v_max - this->v_min) / (align_height - max_base_height);
 
         double TempoBase = (1/this->time_constant) * std::log(this->v_max/this->v_min);
         double TempoTotal = TempoBase + max_base_height / this->v_min;

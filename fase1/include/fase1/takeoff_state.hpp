@@ -46,6 +46,7 @@ public:
         (void)blackboard;
 
         if (this->drone->getArmingState() != DronePX4::ARMING_STATE::ARMED) {
+            this->drone->log("Drone is not armed, arming again.");
             this->drone->toOffboardSync();
             this->drone->armSync();
         }        

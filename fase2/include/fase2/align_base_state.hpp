@@ -85,7 +85,7 @@ public:
             this->approx_offset = this->getApproximateOffset(bbox);
 
             auto approx_base = this->pos.head<2>() + this->approx_offset;
-            this->vision->publishBaseDetection("detected_base", approx_base, -this->mean_base_height); 
+            this->vision->publishBaseDetection("detected_base", approx_base, this->mean_base_height); 
             
 
             if (this->approx_offset.norm() < this->align_tolerance){
@@ -156,7 +156,8 @@ private:
 
         
         // Assuming base is at mean_base_height above the ground
-        double height = -this->pos.z() - this->mean_base_height;
+        // Converting to positive height value
+        double height = - (this->pos.z() - this->mean_base_height);
         
         // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).
         double k = std::atan(this->height_to_ground / 2);

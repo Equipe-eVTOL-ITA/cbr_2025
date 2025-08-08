@@ -49,7 +49,7 @@ public:
                 float min_horizontal_distance = std::numeric_limits<float>::max();
                 
                 // Publish base detection to telemetry
-                this->vision->publishBaseDetection("detected_base", approx_base, -this->mean_base_height); 
+                this->vision->publishBaseDetection("detected_base", approx_base, this->mean_base_height); 
                 
                 if (this->print_counter % 5 == 0) {
                     this->drone->log("");
@@ -82,7 +82,7 @@ public:
                     this->drone->log("Min distance to known base: " + std::to_string(min_horizontal_distance));
                     
                     // Publish first detection as yellow marker
-                    this->vision->publishBaseDetection("first_estimate_base", approx_base, -this->mean_base_height); 
+                    this->vision->publishBaseDetection("first_estimate_base", approx_base, this->mean_base_height); 
                     
                     blackboard.set<Eigen::Vector2d>("approximate_base", approx_base);
                     return "BASE FOUND";
@@ -157,8 +157,9 @@ private:
         double bbox_x = bbox.center_x;
         double bbox_y = bbox.center_y;
 
-        // Assuming base is at mean_base_height (positive value) above the ground
-        double height = -this->pos.z() - this->mean_base_height;
+        // Assuming base is at mean_base_height above the ground
+        // Converting to positive height value
+        double height = - (this->pos.z() - this->mean_base_height);
 
         // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).
         double k = std::atan(this->height_to_ground / 2);
