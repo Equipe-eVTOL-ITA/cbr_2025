@@ -18,12 +18,22 @@ public:
         this->drone->log("");
         this->drone->log("STATE: LANDING");
 
-        this->known_base_radius = *blackboard.get<float>("known_base_radius");
-        this->landing_velocity = *blackboard.get<float>("landing_velocity");
-        this->landing_timeout = *blackboard.get<float>("landing_timeout");
+        this->v_max = *blackboard.get<float>("landing_velocity_max");
+        this->v_min = *blackboard.get<float>("landing_velocity_min");
+        float align_height = *blackboard.get<float>("align_height"); // Negative
+        float max_base_height = *blackboard.get<float>("max_base_height"); // Negative
+
+        //Minus because height is negative
+        this->time_constant = - (this->v_max - this->v_min) / (align_height - max_base_height);
+
+        double TempoBase = (1/this->time_constant) * std::log(this->v_max/this->v_min);
+        double TempoTotal = TempoBase + max_base_height / this->v_min;
+        this->timeout_ = TempoTotal + 5.0;
         this->start_time_ = std::chrono::steady_clock::now();
 
-        this->drone->log("Descending for " + std::to_string(this->landing_timeout) + " s.");
+
+        this->drone->log("Tempo até a Base: " + std::to_string(TempoBase) + " s");
+        this->drone->log("Tempo total de pouso: " + std::to_string(TempoTotal) + " s");
     }
     std::string act(fsm::Blackboard &blackboard) override {
         (void) blackboard;
@@ -31,11 +41,15 @@ public:
         auto current_time = std::chrono::steady_clock::now();
         auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(current_time - this->start_time_).count();
 
-        if (elapsed_time > this->landing_timeout) {
+        float velocity = this->v_max * std::exp(-this->time_constant * elapsed_time);
+
+        velocity = std::clamp(velocity, this->v_min, this->v_max);
+
+        if (elapsed_time > this->timeout_){
             return "LANDED";
         }
 
-        this->drone->setLocalVelocity(0.0, 0.0, this->landing_velocity, 0.0);
+        this->drone->setLocalVelocity(0.0, 0.0, velocity, 0.0);
 
         return "";
     }
@@ -63,8 +77,8 @@ private:
     std::shared_ptr<Drone> drone;
     std::shared_ptr<VisionNode> vision;
 
-    float known_base_radius;
-    float landing_velocity;
-    float landing_timeout;
+    float v_max, v_min;
+    float time_constant;
+    float timeout_;
     std::chrono::steady_clock::time_point start_time_;
 };

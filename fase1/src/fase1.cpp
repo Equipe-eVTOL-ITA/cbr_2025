@@ -137,34 +137,37 @@ public:
 
         std::map<std::string, std::variant<double, std::string>> default_params = {
             {"fictual_home_x", 1.0},
-            {"fictual_home_y", -0.75},
-            {"fictual_home_z", 0.6},
+            {"fictual_home_y", -1.0},
+            {"fictual_home_z", -0.6},
 
             {"num_bases", 6.0},
-
+            {"known_base_radius", 1.5},
+            {"height_to_ground", 1.2},
+            
             {"grid_y_length", -6.0},
             {"grid_step_x", 2.0},
             {"grid_num_steps", 3.0},
 
-            {"takeoff_height", -2.0},
-            {"max_vertical_velocity", 1.5},
-            {"max_horizontal_velocity", 1.0},
-            
-            {"max_search_time", 30.0},
-            {"position_tolerance", 0.08},
-            
-            {"pid_pos_kp", 0.9},
-            {"pid_pos_ki", 0.0},
-            {"pid_pos_kd", 0.05},
-            {"setpoint", 0.5},
+            {"takeoff_height", -2.5},
+            {"align_height", -2.0},
+            {"max_base_height", -1.5},
+            {"mean_base_height", 0.85},
 
-            {"known_base_radius", 1.7},
-            {"height_to_ground", 1.0},
-            {"mean_base_height", 0.75},
+            {"max_vertical_velocity", 1.2},
+            {"max_horizontal_velocity", 1.0},
+            {"landing_velocity_max", 0.5},
+            {"landing_velocity_min", 0.2},
+
+            {"max_search_time", 30.0},
             {"detection_timeout", 10.0},
-            {"align_tolerance", 0.05},
-            {"landing_timeout", 8.0},
-            {"landing_velocity", 0.5}
+
+            {"position_tolerance", 0.07},
+            {"align_tolerance", 0.025},
+
+            {"pid_pos_kp", 1.0},
+            {"pid_pos_ki", 0.01},
+            {"pid_pos_kd", 0.05},
+            {"setpoint", 0.0}
         };
         
         auto params = declareAndGetParameters(default_params);

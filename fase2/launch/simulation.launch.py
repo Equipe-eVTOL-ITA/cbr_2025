@@ -7,17 +7,23 @@ Includes both onboard simulation and ground station analysis tools.
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import TimerAction
+from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.substitutions import LaunchConfiguration
 import os
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    pkg_fase1       = get_package_share_directory('cbr_fase2')
-    simulation_params  = os.path.join(pkg_fase1, "config", "simulation.yaml")
-    fsm_params     = os.path.join(pkg_fase1, "config", "fsm.yaml")
-    rviz_cfg = os.path.join(pkg_fase1, 'launch', 'simulation.rviz')
+    pkg_fase2       = get_package_share_directory('cbr_fase2')
+    simulation_params  = os.path.join(pkg_fase2, "config", "simulation.yaml")
+    fsm_params     = os.path.join(pkg_fase2, "config", "fsm.yaml")
+    rviz_cfg = os.path.join(pkg_fase2, 'launch', 'simulation.rviz')
 
+    exec_arg = DeclareLaunchArgument(
+        "mission",
+        default_value="fase2",
+        description="Executable that implements the mission FSM")
+    
     # Telemetry Handler - core telemetry processing
     telemetry_handler_node = Node(
         package='telemetry_handler',
@@ -68,7 +74,7 @@ def generate_launch_description():
 
     fsm_node = Node(
         package='cbr_fase2',
-        executable='fase2',
+        executable=LaunchConfiguration("mission"),
         parameters=[fsm_params],
         output='screen'
     )
@@ -76,6 +82,7 @@ def generate_launch_description():
     delayed_fsm_node = TimerAction(period=5.0, actions=[fsm_node])
 
     return LaunchDescription([
+        exec_arg,
         telemetry_handler_node,        
         telemetry_dashboard_node,
         telemetry_recorder_node,

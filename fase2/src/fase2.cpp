@@ -42,42 +42,45 @@ public:
             }
         }
         
-        // DYNAMIC GRID ----------------------------------------------------
 
-        float takeoff_height = *this->blackboard_get<float>("takeoff_height");
-        float home_x = *this->blackboard_get<float>("fictual_home_x");
-        float home_y = *this->blackboard_get<float>("fictual_home_y");
-        float y_length = *this->blackboard_get<float>("grid_y_length");
-        float step_x = *this->blackboard_get<float>("grid_step_x");
-        float num_steps = *this->blackboard_get<float>("grid_num_steps");
+        // PACKAGE AND DELIVERY WAYPOINTS-----------------------------------
 
-        int state = 0;
-        int num_steps_taken = 0;
-        bool finished = false;
-        float x_coord = home_x;
-        float y_coord = home_y;
+        std::vector<ArenaPoint> packages;
+        packages.emplace_back(
+            *this->blackboard_get<float>("package_1_x"),
+            *this->blackboard_get<float>("package_1_y"),
+            *this->blackboard_get<float>("package_height")
+        );
+        packages.emplace_back(
+            *this->blackboard_get<float>("package_2_x"),
+            *this->blackboard_get<float>("package_2_y"),
+            *this->blackboard_get<float>("package_height")
+        );
+        packages.emplace_back(
+            *this->blackboard_get<float>("package_3_x"),
+            *this->blackboard_get<float>("package_3_y"),
+            *this->blackboard_get<float>("package_height")
+        );
 
-        std::vector<ArenaPoint> waypoints;
-        while (num_steps_taken < num_steps || !finished) {
-            if (state % 4 == 0) {
-                // Go left
-                y_coord = home_y + y_length;
-                finished = true;
-            } else if (state % 4 == 1 || state % 4 == 3) {
-                // Go front
-                x_coord += step_x;
-                num_steps_taken++;
-                finished = false;
-            } else {
-                // Go right
-                y_coord = home_y;
-                finished = true;
-            }
-            state++;
-            waypoints.push_back({Eigen::Vector3d({x_coord, y_coord, takeoff_height})});
-        }
-        this->blackboard_set<std::vector<ArenaPoint>>("waypoints", waypoints);
-        this->blackboard_set<bool>("finished_bases", false);
+        std::vector<ArenaPoint> deliveries;
+        deliveries.emplace_back(
+            *this->blackboard_get<float>("delivery_1_x"),
+            *this->blackboard_get<float>("delivery_1_y"),
+            *this->blackboard_get<float>("delivery_height")
+        );
+        deliveries.emplace_back(
+            *this->blackboard_get<float>("delivery_2_x"),
+            *this->blackboard_get<float>("delivery_2_y"),
+            *this->blackboard_get<float>("delivery_height")
+        );
+        deliveries.emplace_back(
+            *this->blackboard_get<float>("delivery_3_x"),
+            *this->blackboard_get<float>("delivery_3_y"),
+            *this->blackboard_get<float>("delivery_height")
+        );
+
+        this->blackboard_set<std::vector<ArenaPoint>>("packages", packages);
+        this->blackboard_set<std::vector<ArenaPoint>>("deliveries", deliveries);
 
         // ------------------------------------------------------------------
 
@@ -122,10 +125,9 @@ public:
         this->add_transitions("ALIGN BASE", {
             // GETTING PACKAGE
             {"APPROACH PACKAGE", "APPROACH PACKAGE"},
-            {"LOST PACKAGE BASE", "LOST"},
+            {"LOST", "LOST"},
             // DELIVERING PACKAGE
             {"LAND", "LANDING"},
-            {"LOST DELIVERY BASE", "LOST"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -181,32 +183,49 @@ public:
 
         std::map<std::string, std::variant<double, std::string>> default_params = {
             {"fictual_home_x", 1.0},
-            {"fictual_home_y", -0.75},
-            {"fictual_home_z", 0.6},
+            {"fictual_home_y", -1.0},
+            {"fictual_home_z", -0.6},
 
-            {"grid_y_length", -6.0},
-            {"grid_step_x", 2.0},
-            {"grid_num_steps", 3.0},
+            {"package_1_x", 3.0},
+            {"package_1_y", -1.0},
+            {"package_2_x", 5.0},
+            {"package_2_y", -1.0},
+            {"package_3_x", 7.0},
+            {"package_3_y", -1.0},
 
-            {"takeoff_height", -2.0},
-            {"max_vertical_velocity", 1.5},
+            {"delivery_1_x", 1.0},
+            {"delivery_1_y", -4.0},
+            {"delivery_2_x", 4.25},
+            {"delivery_2_y", -6.0},
+            {"delivery_3_x", 6.5},
+            {"delivery_3_y", -7.0},
+
+            {"takeoff_height", -3.0},
+            {"align_package_height", -2.0},
+            {"package_height", -1.5},
+            {"delivery_height", 0.0},
+
+            {"max_vertical_velocity", 1.0},
             {"max_horizontal_velocity", 1.0},
-            
-            {"max_search_time", 30.0},
-            {"position_tolerance", 0.08},
-            
-            {"pid_pos_kp", 0.9},
-            {"pid_pos_ki", 0.0},
-            {"pid_pos_kd", 0.05},
-            {"setpoint", 0.5},
+            {"descent_velocity", 0.15},
+            {"landing_velocity", 0.5},
 
-            {"known_base_radius", 1.7},
-            {"height_to_ground", 1.0},
-            {"mean_base_height", 0.75},
+            {"garra_timeout", 5.0},
             {"detection_timeout", 10.0},
-            {"align_tolerance", 0.05},
-            {"landing_timeout", 8.0},
-            {"landing_velocity", 0.5}
+            {"landing_timeout", 7.0},
+
+            {"position_tolerance", 0.07},
+            {"align_base_tolerance", 0.05},
+            {"align_package_tolerance", 0.02},
+
+            {"pid_pos_kp", 1.0},
+            {"pid_pos_ki", 0.01},
+            {"pid_pos_kd", 0.05},
+            {"setpoint", 0.0},
+
+            {"known_base_radius", 1.5},
+            {"height_to_ground", 1.2}
+
         };
         
         auto params = declareAndGetParameters(default_params);

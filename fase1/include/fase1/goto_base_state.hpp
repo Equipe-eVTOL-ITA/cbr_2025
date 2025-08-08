@@ -18,7 +18,7 @@ public:
 
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
-        this->takeoff_height = *blackboard.get<float>("takeoff_height");
+        this->align_height = *blackboard.get<float>("align_height");
 
         auto approx_base = *blackboard.get<Eigen::Vector2d>("approximate_base");
         this->initial_yaw = this->drone->getOrientation()[2];
@@ -26,7 +26,7 @@ public:
         this->goal = Eigen::Vector3d(
             approx_base.x(),
             approx_base.y(),
-            this->takeoff_height
+            this->align_height
         );
     }
 
@@ -62,7 +62,7 @@ private:
     std::shared_ptr<Drone> drone;
     float max_velocity;
     float position_tolerance;
-    float takeoff_height;
+    float align_height;
     float initial_yaw;
     Eigen::Vector3d goal;
 };

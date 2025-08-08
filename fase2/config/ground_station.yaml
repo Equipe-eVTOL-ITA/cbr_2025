@@ -12,6 +12,8 @@ telemetry_recorder:
       enable: true
       max_duration_minutes: 10
       max_file_size_mb: 1000
+      include_images: false
+      recording_formats: ["rosbag"]
       output_directory: "~/frtl_2025_ws/flight_logs/ground_station"
       autosave_time: 180.0  # Auto-save every 3 minutes
 
@@ -19,6 +21,7 @@ telemetry_dashboard:
   ros__parameters:
     network:
       ping_target: "8.8.8.8"  # Network monitoring target
+      ground_station_ip: "192.168.0.100"
     topics:
       position: "/telemetry/position"
       drone_status: "/telemetry/drone_status"

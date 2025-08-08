@@ -35,6 +35,16 @@ public:
         this->kd = *blackboard.get<float>("pid_pos_kd");
         this->setpoint = *blackboard.get<float>("setpoint");
 
+        this->package_state = *blackboard.get<std::string>("package_state");
+
+        if (this->package_state == "get_package") {
+            this->drone->log("Aligning to package base");
+        } else if (this->package_state == "deliver_package") {
+            this->drone->log("Aligning to delivery base");
+        } else {
+            this->drone->log("Unknown package state: " + this->package_state);
+        }
+
 
         this->print_counter = 0;
         this->no_detection_counter = 0;
@@ -131,6 +141,8 @@ private:
     int print_counter;
     int no_detection_counter;
     int total_detected, total_undetected;
+
+    std::string package_state;
     
     
     Eigen::Vector3d pos;

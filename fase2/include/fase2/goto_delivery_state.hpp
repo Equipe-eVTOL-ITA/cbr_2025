@@ -20,12 +20,19 @@ public:
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
         this->takeoff_height = *blackboard.get<float>("takeoff_height");
 
-        auto approx_base = *blackboard.get<Eigen::Vector2d>("approximate_base");
+        auto deliveries = blackboard.get<std::vector<ArenaPoint>>("deliveries");
+        auto delivery = getNextPoint(deliveries);
+
+        if (delivery == nullptr) {
+            this->drone->log("ERROR! No delivery unvisited!");
+            return;
+        }
+
         this->initial_yaw = this->drone->getOrientation()[2];
 
         this->goal = Eigen::Vector3d(
-            approx_base.x(),
-            approx_base.y(),
+            delivery->coordinates.x(),
+            delivery->coordinates.y(),
             this->takeoff_height
         );
     }
@@ -38,7 +45,7 @@ public:
         Eigen::Vector3d diff = this->goal - pos;
 
         if(diff.norm() < this->position_tolerance){
-            return "OVER THE BASE";
+            return "AT DELIVERY BASE";
         }
 
         Eigen::Vector3d little_goal = pos + (diff.norm() > this->max_velocity ?
@@ -55,7 +62,7 @@ public:
     }
 
     void on_exit(fsm::Blackboard &blackboard) override {
-        (void)blackboard;
+        blackboard.set<std::string>("package_state", "deliver_package");
     }
 
 private:

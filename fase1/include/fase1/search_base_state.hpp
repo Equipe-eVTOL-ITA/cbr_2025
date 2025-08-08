@@ -26,7 +26,7 @@ public:
         this->print_counter = 0;
 
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
-        this->initial_yaw = drone->getOrientation()[2];
+        this->initial_yaw = 0.0f;
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
         this->known_base_radius = *blackboard.get<float>("known_base_radius");
         this->height_to_ground = *blackboard.get<float>("height_to_ground");

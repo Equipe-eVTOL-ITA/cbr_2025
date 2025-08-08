@@ -12,9 +12,9 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    pkg_fase1   = get_package_share_directory('cbr_fase2')
-    ground_station_params      = os.path.join(pkg_fase1, "config", "ground_station.yaml")
-    rviz_cfg = os.path.join(pkg_fase1, 'launch', 'ground_station.rviz')
+    pkg_fase2   = get_package_share_directory('cbr_fase2')
+    ground_station_params      = os.path.join(pkg_fase2, "config", "ground_station.yaml")
+    rviz_cfg = os.path.join(pkg_fase2, 'launch', 'ground_station.rviz')
 
     # Telemetry Handler - core telemetry processing
     telemetry_handler_node = Node(

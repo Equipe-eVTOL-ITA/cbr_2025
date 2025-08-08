@@ -44,7 +44,11 @@ public:
 
     std::string act(fsm::Blackboard &blackboard) override {
         (void)blackboard;
-        
+
+        if (this->drone->getArmingState() != DronePX4::ARMING_STATE::ARMED) {
+            this->drone->toOffboardSync();
+            this->drone->armSync();
+        }        
         if (this->print_counter%10==0){
             this->drone->log("Pos: {" + std::to_string(this->pos[0]) + ", " 
             + std::to_string(this->pos[1]) + ", " + std::to_string(this->pos[2]) + "}");

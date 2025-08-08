@@ -14,18 +14,25 @@ public:
         if(this->drone == nullptr) return;
 
         this->drone->log("");
-        this->drone->log("STATE: GO TO BASE");
+        this->drone->log("STATE: GO TO PACKAGE");
 
         this->max_velocity = *blackboard.get<float>("max_horizontal_velocity");
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
         this->takeoff_height = *blackboard.get<float>("takeoff_height");
 
-        auto approx_base = *blackboard.get<Eigen::Vector2d>("approximate_base");
+        auto packages = blackboard.get<std::vector<ArenaPoint>>("packages");
+        auto package = getNextPoint(packages);
+
+        if (package == nullptr) {
+            this->drone->log("ERROR! No package unvisited!");
+            return;
+        }
+
         this->initial_yaw = this->drone->getOrientation()[2];
 
         this->goal = Eigen::Vector3d(
-            approx_base.x(),
-            approx_base.y(),
+            package->coordinates.x(),
+            package->coordinates.y(),
             this->takeoff_height
         );
     }
@@ -55,7 +62,7 @@ public:
     }
 
     void on_exit(fsm::Blackboard &blackboard) override {
-        (void)blackboard;
+        blackboard.set<std::string>("package_state", "get_package");
     }
 
 private:

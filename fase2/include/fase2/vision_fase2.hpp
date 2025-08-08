@@ -27,7 +27,7 @@ struct BoundingBox {
 
 class VisionNode : public rclcpp::Node {
 public:
-    VisionNode() : Node("fase1_vision") {
+    VisionNode() : Node("fase2_vision") {
         // QoS optimizado para visão computacional
         rclcpp::QoS vision_qos(10);
         vision_qos.best_effort();

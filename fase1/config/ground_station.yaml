@@ -20,7 +20,7 @@ telemetry_recorder:
 telemetry_dashboard:
   ros__parameters:
     network:
-      ping_target: "192.168.0.152"  # Network monitoring target
+      ping_target: "8.8.8.8"  # Network monitoring target
       ground_station_ip: "192.168.0.100"
     topics:
       position: "/telemetry/position"
