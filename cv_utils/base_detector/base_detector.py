@@ -283,15 +283,22 @@ class BaseDetector(Node):
             x, y, w, h = detection['bbox']
             area = detection['area'] / img_area
             aspect_ratio = detection['aspect_ratio']
-            
-            # Draw bounding box in pink
-            cv2.rectangle(bbox_debug_image, (x, y), (x+w, y+h), (255, 0, 255), 2)
-            
+            # If we have rotated box info, draw rotated rectangle
+            if 'angle' in detection and 'size' in detection and 'center' in detection:
+                cx, cy = detection['center']
+                sz_w, sz_h = detection['size']
+                angle_deg = np.rad2deg(detection['angle'])
+                rect = ((cx, cy), (sz_w, sz_h), angle_deg)
+                box_pts = cv2.boxPoints(rect).astype(int)
+                cv2.drawContours(bbox_debug_image, [box_pts], 0, (255, 0, 255), 2)
+            else:
+                cv2.rectangle(bbox_debug_image, (x, y), (x+w, y+h), (255, 0, 255), 2)
+
             # Add text with area and aspect ratio
             text = f"Area: {area:.3f}, AR: {aspect_ratio:.2f}"
-            cv2.putText(bbox_debug_image, text, (x, y-10), 
+            cv2.putText(bbox_debug_image, text, (x, y-10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
-        
+
         # Add statistics
         stats_text = f"Detections: {len(detections)}"
         cv2.putText(bbox_debug_image, stats_text, (10, 30), 
@@ -340,7 +347,7 @@ class BaseDetector(Node):
         return mask_debug
     
     def _find_combined_regions(self, blue_mask: np.ndarray, yellow_mask: np.ndarray) -> List[Dict]:
-        """Find regions that contain both yellow and blue pixels"""
+        """Find regions that contain both yellow and blue pixels (include rotation)"""
         detections = []
         
         # Get image dimensions for normalization calculations
@@ -376,33 +383,41 @@ class BaseDetector(Node):
             if area < min_area_pixels or area > max_area_pixels:
                 continue
             
-            # Get bounding rectangle
+            # Axis-aligned bounding rect for ROI checks
             x, y, w, h = cv2.boundingRect(contour)
-            aspect_ratio = max(w, h) / min(w, h) if min(w, h) > 0 else 0
             
-            # Check aspect ratio constraints
+            # Use minAreaRect to obtain rotated box (center, size, angle)
+            rect = cv2.minAreaRect(contour)  # ((cx, cy), (width, height), angle_degrees)
+            (cx, cy), (rect_w, rect_h), angle_deg = rect
+            # ignore degenerate sizes
+            if rect_w <= 0 or rect_h <= 0:
+                continue
+            
+            # Compute aspect ratio from rotated box
+            aspect_ratio = max(rect_w, rect_h) / min(rect_w, rect_h) if min(rect_w, rect_h) > 0 else 0
             if not (self.combined_aspect_ratio_min <= aspect_ratio <= self.combined_aspect_ratio_max):
                 continue
             
-            # Check if this region actually contains both colors in original masks
+            # Check if this region actually contains both colors in original masks (use axis-aligned ROI)
             roi_blue = blue_mask[y:y+h, x:x+w]
             roi_yellow = yellow_mask[y:y+h, x:x+w]
             
             blue_pixels = np.sum(roi_blue > 0)
             yellow_pixels = np.sum(roi_yellow > 0)
             
-            # Require minimum presence of both colors
             min_pixels = 100  # Minimum pixels for each color
             if blue_pixels < min_pixels or yellow_pixels < min_pixels:
                 continue
             
             detection = {
-                'bbox': (x, y, w, h),
-                'center': (x + w/2, y + h/2),
+                'bbox': (x, y, w, h),                         # axis-aligned for quick drawing/roi
+                'center': (float(cx), float(cy)),             # rotated center in pixels
+                'size': (float(rect_w), float(rect_h)),       # rotated width/height in pixels
+                'angle': float(np.deg2rad(angle_deg)),        # angle in radians
                 'area': area,
                 'aspect_ratio': aspect_ratio,
-                'blue_pixels': blue_pixels,
-                'yellow_pixels': yellow_pixels,
+                'blue_pixels': int(blue_pixels),
+                'yellow_pixels': int(yellow_pixels),
                 'class_id': 'landing_pad'
             }
             detections.append(detection)
@@ -469,18 +484,29 @@ class BaseDetector(Node):
         for det in detections:
             detection = Detection2D()
             
-            # Set bounding box - NORMALIZE TO [0,1]
-            x, y, w, h = det['bbox']
-            detection.bbox.center.position.x = float(x + w/2) / img_width
-            detection.bbox.center.position.y = float(y + h/2) / img_height
-            detection.bbox.center.theta = 0.0
-            detection.bbox.size_x = float(w) / img_width
-            detection.bbox.size_y = float(h) / img_height     
+            # Use rotated box center/size/angle when available
+            if 'center' in det and 'size' in det:
+                cx, cy = det['center']
+                sz_w, sz_h = det['size']
+                detection.bbox.center.position.x = float(cx) / img_width
+                detection.bbox.center.position.y = float(cy) / img_height
+                detection.bbox.size_x = float(sz_w) / img_width
+                detection.bbox.size_y = float(sz_h) / img_height
+            else:
+                # Fallback to axis-aligned bbox center/size
+                x, y, w, h = det['bbox']
+                detection.bbox.center.position.x = float(x + w/2) / img_width
+                detection.bbox.center.position.y = float(y + h/2) / img_height
+                detection.bbox.size_x = float(w) / img_width
+                detection.bbox.size_y = float(h) / img_height
+
+            # Publish angle (expect radians)
+            detection.bbox.center.theta = float(det.get('angle', 0.0))
             
             # Set hypothesis (no confidence score for now)
             hypothesis = ObjectHypothesisWithPose()
             hypothesis.hypothesis.class_id = det['class_id']
-            hypothesis.hypothesis.score = 1.0  # Fixed score since no confidence calculation
+            hypothesis.hypothesis.score = 1.0
             detection.results = [hypothesis]
             
             detection_array.detections.append(detection)

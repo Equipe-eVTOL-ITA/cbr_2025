@@ -20,6 +20,7 @@ struct BoundingBox {
     float center_y;
     float width;
     float height;
+    float rotation; // radians, read from Detection2D.bbox.center.theta
     float confidence;
     std::string class_id;
     int64_t timestamp;
@@ -57,6 +58,7 @@ public:
                     bbox.center_y = detection.bbox.center.position.y;
                     bbox.width = detection.bbox.size_x;
                     bbox.height = detection.bbox.size_y;
+                    bbox.rotation = detection.bbox.center.theta;  // store rotation
                     bbox.confidence = detection.results[0].hypothesis.score;
                     bbox.class_id = detection.results[0].hypothesis.class_id;
                     bbox.timestamp = msg->header.stamp.sec * 1000000000LL + msg->header.stamp.nanosec;
