@@ -42,7 +42,7 @@ public:
 
 
         Base base{this->drone->getLocalPosition(), true};
-        this->vision->publishBaseDetection("confirmed_base", this->pos.head<2>(), this->pos.z());
+        this->vision->publishBaseDetection("confirmed_base", this->pos);
         
         std::vector<Base> bases;
         bases.push_back(base);

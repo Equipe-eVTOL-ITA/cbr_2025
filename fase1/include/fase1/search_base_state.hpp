@@ -38,18 +38,18 @@ public:
         this->print_counter++;
 
         this->pos = this->drone->getLocalPosition();
-        this->yaw = this->drone->getOrientation()[2];
+        this->orientation = this->drone->getOrientation();
 
         if (this->vision->isThereDetection()) {
             auto bboxes = this->vision->getDetections();
 
             for (const auto& bbox : bboxes) {
-                const Eigen::Vector2d approx_base = getApproximateBase(bbox);
+                const Eigen::Vector3d approx_base = this->vision->getApproximateBase(this->pos, this->orientation, bbox, this->mean_base_height);
                 bool is_known_base = false;
                 float min_horizontal_distance = std::numeric_limits<float>::max();
                 
                 // Publish base detection to telemetry
-                this->vision->publishBaseDetection("detected_base", approx_base, this->mean_base_height); 
+                this->vision->publishBaseDetection("detected_base", approx_base); 
                 
                 if (this->print_counter % 5 == 0) {
                     this->drone->log("");
@@ -57,7 +57,7 @@ public:
                 }
 
                 for (const auto& base : *this->bases) {
-                    float horizontal_distance = (approx_base - base.coordinates.head<2>()).norm();
+                    float horizontal_distance = (approx_base.head<2>() - base.coordinates.head<2>()).norm();
 
                     min_horizontal_distance = std::min(min_horizontal_distance, horizontal_distance);
                     
@@ -82,9 +82,9 @@ public:
                     this->drone->log("Min distance to known base: " + std::to_string(min_horizontal_distance));
                     
                     // Publish first detection as yellow marker
-                    this->vision->publishBaseDetection("first_estimate_base", approx_base, this->mean_base_height); 
+                    this->vision->publishBaseDetection("first_estimate_base", approx_base); 
                     
-                    blackboard.set<Eigen::Vector2d>("approximate_base", approx_base);
+                    blackboard.set<Eigen::Vector3d>("approximate_base", approx_base);
                     return "BASE FOUND";
                 }
             }
@@ -129,7 +129,6 @@ private:
     std::vector<Base>* bases;
 
     float initial_yaw;
-    float yaw;
     float position_tolerance;
     float max_velocity;
 
@@ -139,7 +138,7 @@ private:
     float height_to_ground;
     float mean_base_height;
 
-    Eigen::Vector3d pos;
+    Eigen::Vector3d pos, orientation;
     
     ArenaPoint* getNextPoint(std::vector<ArenaPoint>* waypoints) {
         if (!waypoints) return nullptr;
@@ -150,32 +149,5 @@ private:
         }
         // Return nullptr if no unvisited points are found
         return nullptr;
-    }
-
-    Eigen::Vector2d getApproximateBase(BoundingBox bbox) {
-
-        double bbox_x = bbox.center_x;
-        double bbox_y = bbox.center_y;
-
-        // Assuming base is at mean_base_height above the ground
-        // Converting to positive height value
-        double height = - (this->pos.z() - this->mean_base_height);
-
-        // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).
-        double k = std::atan(this->height_to_ground / 2);
-
-        // Yolo coordinates: x -> left to right, y -> top to bottom
-        double x_img = height * std::tan(k * 2 * (bbox_x - 0.5));
-        double y_img = height * std::tan(k * 2 * (bbox_y - 0.5));
-
-        // Drone coordinates: x -> front, y -> right
-        double x_drone = - y_img;
-        double y_drone = x_img;
-
-        // FRD (Forward-Right-Down) coordinates
-        double frd_x = x_drone * cos(this->yaw) - y_drone * sin(this->yaw);
-        double frd_y = x_drone * sin(this->yaw) + y_drone * cos(this->yaw);
-        
-        return this->pos.head<2>() + Eigen::Vector2d({frd_x, frd_y});
     }
 };

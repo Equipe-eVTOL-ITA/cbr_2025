@@ -38,11 +38,11 @@ public:
 
         this->print_counter = 0;
         this->no_detection_counter = 0;
-        this->approx_offset = Eigen::Vector2d::Zero();
+        this->aligned_counter = 0;
+        this->horizontal_distance = 0;
 
         this->total_detected = 0;
         this->total_undetected = 0;
-
 
         this->x_pid = PidController(this->kp, this->ki, this->kd, this->setpoint);
         this->y_pid = PidController(this->kp, this->ki, this->kd, this->setpoint);
@@ -53,17 +53,16 @@ public:
         this->print_counter++;
 
         this->pos = this->drone->getLocalPosition();
-        this->yaw = this->drone->getOrientation()[2];
-        
-        if (this->print_counter % 5 == 0 ){
-            this->drone->log("");
-            this->drone->log("yaw=" + std::to_string(this->yaw));
-            this->drone->log("Detected: " + std::to_string(this->total_detected) + ", Undetected: " + std::to_string(this->total_undetected));
-        }
+        this->orientation = this->drone->getOrientation();
+
 
         if (this->vision->lastBaseDetectionTime() > this->detection_timeout){
             this->drone->log("NO DETECTION TIMEOUT EXCEEDED: " + std::to_string(this->detection_timeout) + "s.");
             return "LOST BASE";
+        }
+
+        if (this->aligned_counter > 10){
+            return "PRECISELY ALIGNED";
         }
 
         
@@ -72,16 +71,17 @@ public:
             
             this->no_detection_counter = 0;
             auto bbox = this->vision->getClosestBbox();
-            this->approx_offset = this->getApproximateOffset(bbox);
+            this->approx_base = this->vision->getApproximateBase(this->pos, this-> orientation, bbox, this->mean_base_height);
+            this->horizontal_distance = (approx_base.head<2>() - this->pos.head<2>()).norm();
 
-            auto approx_base = this->pos.head<2>() + this->approx_offset;
-            this->vision->publishBaseDetection("detected_base", approx_base, this->mean_base_height); 
-            
+            this->vision->publishBaseDetection("detected_base", approx_base); 
 
-            if (this->approx_offset.norm() < this->align_tolerance){
-                return "PRECISELY ALIGNED";
+            if (this->horizontal_distance < this->align_tolerance){
+                this->aligned_counter++;
             }
-
+            else{
+                this->aligned_counter = 0;
+            }
         }
         else {
             this->total_undetected++;
@@ -93,26 +93,23 @@ public:
             }
         }
 
+        Eigen::Vector2d diff = this->approx_base.head<2>() - this->pos.head<2>();
+        Eigen::Vector2d goal = diff.norm() > this->max_velocity ? diff.normalized() * this->max_velocity : diff;
+        float z_rate = 0.0;
 
-        float x_rate = x_pid.compute(this->setpoint - this->approx_offset.x());
-        float y_rate = y_pid.compute(this->setpoint - this->approx_offset.y());
 
-        // Limit horizontal velocity to max_velocity
-        Eigen::Vector2d rate = Eigen::Vector2d({x_rate, y_rate});
-        rate = rate.norm() > this->max_velocity ? 
-               rate.normalized() * this->max_velocity : rate;
-
-        float z_rate = 0.0f;
-        if (this->approx_offset.norm() < 3 * this->align_tolerance) {
+        if (this->horizontal_distance < 4 * this->align_tolerance) {
             z_rate = this->align_descent_velocity;
         }
-        
-        if (this->print_counter % 5 == 0 ){
-            this->drone->log("Rates: x=" + std::to_string(rate.x()) +
-                             ", y=" + std::to_string(rate.y()) + ", z=" + std::to_string(z_rate));
-        }
 
-        this->drone->setLocalVelocity(rate.x(), rate.y(), z_rate, 0.0);
+        if (this->print_counter % 5 == 0 ){
+            this->drone->log("");
+            this->drone->log("Detected: " + std::to_string(this->total_detected) + ", Undetected: " + std::to_string(this->total_undetected));
+            this->drone->log("Diff: {" + std::to_string(goal.x()) + ", " + std::to_string(goal.y()) + ", " + std::to_string(z_rate) + "}");
+        }
+        
+
+        this->drone->setLocalVelocity(goal.x(), goal.y(), z_rate, 0.0);
 
         return "";
     }
@@ -135,45 +132,11 @@ private:
     
     int print_counter;
     int no_detection_counter;
+    int aligned_counter;
     int total_detected, total_undetected;
+
+    float horizontal_distance;
     
-    
-    Eigen::Vector3d pos;
-    Eigen::Vector2d approx_offset;
-    float yaw;
-
-    Eigen::Vector2d getApproximateOffset(BoundingBox bbox) {
-
-        double bbox_x = bbox.center_x;
-        double bbox_y = bbox.center_y;
-
-        
-        // Assuming base is at mean_base_height above the ground
-        // Converting to positive height value
-        double height = - (this->pos.z() - this->mean_base_height);
-        
-        // height_to_ground: ratio between distance seen in image (from left to right) and distance from the ground (height).
-        double k = std::atan(this->height_to_ground / 2);
-        
-        // Yolo coordinates: x -> left to right, y -> top to bottom
-        double x_img = height * std::tan(k * 2 * (bbox_x - 0.5));
-        double y_img = height * std::tan(k * 2 * (bbox_y - 0.5));
-        
-        
-        // Drone coordinates: x -> front, y -> right
-        double x_drone = - y_img;
-        double y_drone = x_img;
-        
-        // FRD (Forward-Right-Down) coordinates
-        double x_frd = x_drone * cos(this->yaw) - y_drone * sin(this->yaw);
-        double y_frd = x_drone * sin(this->yaw) + y_drone * cos(this->yaw);
-
-        
-        if (this->print_counter % 5 == 0 ){
-            this->drone->log("Bbox center: x=" + std::to_string(bbox_x) + ", y=" + std::to_string(bbox_y));
-            this->drone->log("x_frd=" + std::to_string(x_frd) + ", y_frd=" + std::to_string(y_frd));
-        }
-        
-        return Eigen::Vector2d({x_frd, y_frd});
-    }
+    Eigen::Vector3d pos, orientation;
+    Eigen::Vector3d approx_base;
 };

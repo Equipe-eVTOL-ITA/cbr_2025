@@ -20,7 +20,7 @@ public:
         this->position_tolerance = *blackboard.get<float>("position_tolerance");
         this->align_height = *blackboard.get<float>("align_height");
 
-        auto approx_base = *blackboard.get<Eigen::Vector2d>("approximate_base");
+        auto approx_base = *blackboard.get<Eigen::Vector3d>("approximate_base");
         this->initial_yaw = this->drone->getOrientation()[2];
 
         this->goal = Eigen::Vector3d(
