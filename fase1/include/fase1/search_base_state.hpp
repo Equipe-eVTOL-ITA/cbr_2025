@@ -44,7 +44,7 @@ public:
             auto bboxes = this->vision->getDetections();
 
             for (const auto& bbox : bboxes) {
-                const Eigen::Vector3d approx_base = this->vision->getApproximateBase(this->pos, this->orientation, bbox, this->mean_base_height);
+                const Eigen::Vector3d approx_base = this->vision->getAccurateBase(this->pos, this->orientation, bbox);
                 bool is_known_base = false;
                 float min_horizontal_distance = std::numeric_limits<float>::max();
                 

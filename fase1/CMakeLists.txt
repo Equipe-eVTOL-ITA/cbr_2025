@@ -40,8 +40,6 @@ ament_target_dependencies(fase1
   cv_bridge
 )
 
-target_link_libraries(fase1 ${OpenCV_LIBS})
-
 
 #fase1_tester
 add_executable(fase1_tester
@@ -58,6 +56,10 @@ ament_target_dependencies(fase1_tester
   visualization_msgs
   cv_bridge
 )
+
+# Link libraries
+target_link_libraries(fase1 ${OpenCV_LIBS})
+target_link_libraries(fase1_tester ${OpenCV_LIBS})
 
 #Install
 

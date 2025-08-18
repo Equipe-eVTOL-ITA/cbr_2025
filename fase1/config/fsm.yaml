@@ -2,19 +2,21 @@ fase1_fsm:
   ros__parameters:
     fictual_home_x: 1.0
     fictual_home_y: -1.0
-    fictual_home_z: -0.6 # Remember z points Down
+    fictual_home_z: -0.6      # FRD: z positive is DOWN
 
-    num_bases: 6.0 # Bases to visit (excluding home)
-    known_base_radius: 1.5
-    height_to_ground: 1.1 #0.65 on jetson
-    
-    # Dynamic grid parameters
-    grid_y_length: -6.0 # Negative -> grid spawns to the left of home
-    grid_step_x: 2.0 # Step size in x direction
-    grid_num_steps: 3.0 # Number of steps in x direction
+    num_bases: 6.0
+    known_base_radius: 1.7
+
+    # Kept for the FSM logic; NOT used inside vision anymore
+    height_to_ground: 1.1
+
+    # Flight profile
+    grid_y_length: -6.0
+    grid_step_x: 2.0
+    grid_num_steps: 3.0
 
     takeoff_height: -3.5
-    align_height: -2.4
+    align_height:  -2.7
     max_base_height: -1.5
     mean_base_height: -0.75
 
@@ -38,3 +40,55 @@ fase1_fsm:
 fase1_vision:
   ros__parameters:
     timeout: 10.0
+
+    # ===== Choose ONE way to set intrinsics =====
+    # A) If you calibrated the RESIZED stream (recommended), set fx/fy/cx/cy directly:
+    fx: 0.0            # e.g., 735.2
+    fy: 0.0            # e.g., 735.0
+    cx: 0.0            # e.g., 400.0 for 800x800
+    cy: 0.0
+
+    # B) Otherwise, set original camera size and HFOV. The code will model the center crop and resize.
+    camera_horizontal_fov: 1.047      # ~60 deg
+    camera_original_width: 800       # raw webcam resolution before crop/resize
+    camera_original_height: 800
+    # Published image size (from your publisher)
+    image_width: 800
+    image_height: 800
+
+
+    # ===== Distortion (for the PUBLISHED stream) =====
+    dist_k1: 0.0
+    dist_k2: 0.0
+    dist_p1: 0.0
+    dist_p2: 0.0
+    dist_k3: 0.0
+
+    # ===== BBox coordinate mode =====
+    bbox_is_normalized: true     # true if Detection2D uses [0..1]; false if pixel coordinates
+
+    # ===== Extrinsics: pose of camera expressed in BODY/FRD =====
+    # R_b_c = Rz(yaw)*Ry(pitch)*Rx(roll) maps camera vectors → body.
+    # These MUST describe your physical mount.
+    # Example below assumes a down-looking camera where:
+    # image +x maps to body +Y (right),
+    # image +y maps to body −X (back),
+    # optical axis (+Z_cam) maps to body +Z (down).
+    camera_roll: 0.0
+    camera_pitch: 0.0
+    camera_yaw:   1.570796327
+
+    # Camera position wrt body origin (meters). Positive z means below the FCU (FRD).
+    camera_tx: 0.0
+    camera_ty: 0.0
+    camera_tz: 0.0
+
+    # Real-world size of the base square in meters
+    bbox_real_size: 1.0
+
+    # Plane z used by getApproximateBase (FRD z, positive down)
+    mean_base_height: -0.75
+
+    # getAccurateBase: if true, project final point onto this plane z after PnP
+    accurate_project_to_ground: false
+    accurate_ground_z: -0.75

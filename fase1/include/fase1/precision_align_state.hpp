@@ -71,7 +71,7 @@ public:
             
             this->no_detection_counter = 0;
             auto bbox = this->vision->getClosestBbox();
-            this->approx_base = this->vision->getApproximateBase(this->pos, this-> orientation, bbox, this->mean_base_height);
+            this->approx_base = this->vision->getAccurateBase(this->pos, this-> orientation, bbox);
             this->horizontal_distance = (approx_base.head<2>() - this->pos.head<2>()).norm();
 
             this->vision->publishBaseDetection("detected_base", approx_base); 
@@ -94,22 +94,29 @@ public:
         }
 
         Eigen::Vector2d diff = this->approx_base.head<2>() - this->pos.head<2>();
-        Eigen::Vector2d goal = diff.norm() > this->max_velocity ? diff.normalized() * this->max_velocity : diff;
         float z_rate = 0.0;
-
 
         if (this->horizontal_distance < 4 * this->align_tolerance) {
             z_rate = this->align_descent_velocity;
         }
-
+        
+        float x_rate = x_pid.compute(this->setpoint - diff.x());
+        float y_rate = y_pid.compute(this->setpoint - diff.y());
+        
+        // Limit velocity to max_velocity
+        Eigen::Vector2d rate = Eigen::Vector2d({x_rate, y_rate});
+        rate = rate.norm() > this->max_velocity ? 
+        rate.normalized() * this->max_velocity : rate;
+        
         if (this->print_counter % 5 == 0 ){
             this->drone->log("");
             this->drone->log("Detected: " + std::to_string(this->total_detected) + ", Undetected: " + std::to_string(this->total_undetected));
-            this->drone->log("Diff: {" + std::to_string(goal.x()) + ", " + std::to_string(goal.y()) + ", " + std::to_string(z_rate) + "}");
+            this->drone->log("Rates: {" + std::to_string(rate.x()) + ", " + std::to_string(rate.y()) + ", " + std::to_string(z_rate) + "}");
         }
-        
 
-        this->drone->setLocalVelocity(goal.x(), goal.y(), z_rate, 0.0);
+
+        this->drone->setLocalVelocity(rate.x(), rate.y(), z_rate, 0.0);
+
 
         return "";
     }
