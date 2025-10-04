@@ -1,0 +1,25 @@
+# Configuração do PackageState
+# Parâmetros para manipulação de packages
+
+# === Operações Suportadas ===
+# package_operation: "pickup" ou "drop"
+package_operation: "pickup"              # Operação a ser realizada
+
+# === Timeouts ===
+package_operation_timeout: 5.0           # segundos - tempo máximo para operação
+
+# === Configurações do Script ===
+# O script gancho_drop.py será chamado com:
+# - "close" para pickup (pegar package)
+# - "open" para drop (soltar package)
+
+# === Parâmetros para Detecção de Sucesso (Futuro) ===
+# Estes parâmetros serão usados quando implementarmos a verificação via thrust
+package_weight_thrust_threshold: 0.5    # N ou % - diferença mínima no thrust para detectar package
+baseline_thrust_samples: 10             # número de amostras para calcular thrust baseline
+thrust_stabilization_time: 2.0          # segundos - tempo para estabilização após operação
+
+# === Integração com Estados de Alinhamento ===
+# O PackageState pode ser usado após AlignPackageState
+align_to_package_tolerance: 0.05        # metros - tolerância final para pickup
+align_to_base_tolerance: 0.1            # metros - tolerância final para drop

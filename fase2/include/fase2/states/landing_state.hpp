@@ -2,8 +2,8 @@
 #include <chrono>
 #include "fsm/fsm.hpp"
 #include "drone/Drone.hpp"
-#include "vision_fase2.hpp"
-#include "Base.hpp"
+#include "fase2/aux/vision_fase2.hpp"
+#include "fase2/aux/Base.hpp"
 
 
 class LandingState : public fsm::State {
@@ -42,7 +42,8 @@ public:
 
     void on_exit(fsm::Blackboard &blackboard) override {
         Eigen::Vector3d pos = this->drone->getLocalPosition();
-        this->vision->publishBaseDetection("confirmed_base", pos.head<2>(), pos.z());
+        Eigen::Vector2d pos_2d = pos.head<2>();
+        this->vision->publishBaseDetection("confirmed_base", pos_2d, pos.z());
 
         auto bases = blackboard.get<std::vector<Base>>("bases");
         bases->push_back({pos, true});

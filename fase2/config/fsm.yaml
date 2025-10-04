@@ -1,53 +1,89 @@
 fase2_fsm:
   ros__parameters:
+    # === Posições Home e Waypoints ===
     fictual_home_x: 1.0
     fictual_home_y: -1.0
     fictual_home_z: -0.6 # Remember z points Down
+    
+    # Coordenadas das bases (A, B, C)
+    base_A_x: 3.0
+    base_A_y: -1.0
+    base_B_x: 5.0
+    base_B_y: -1.0
+    base_C_x: 7.0
+    base_C_y: -1.0
+    
+    # Coordenadas das entregas (A, B, C)
+    deliver_A_x: 1.0
+    deliver_A_y: -4.0
+    deliver_B_x: 4.25
+    deliver_B_y: -6.0
+    deliver_C_x: 6.5
+    deliver_C_y: -7.0
 
-    package_1_x: 3.0
-    package_1_y: -1.0
-
-    package_2_x: 5.0
-    package_2_y: -1.0
-
-    package_3_x: 7.0
-    package_3_y: -1.0
-
-    delivery_1_x: 1.0
-    delivery_1_y: -4.0
-
-    delivery_2_x: 4.25
-    delivery_2_y: -6.0
-
-    delivery_3_x: 6.5
-    delivery_3_y: -7.0
-
+    # === Alturas e Velocidades ===
     takeoff_height: -3.0
     align_package_height: -2.0
     package_height: -1.5
     delivery_height: 0.0
-
     max_vertical_velocity: 1.0
     max_horizontal_velocity: 1.0
-    descent_velocity: 0.15
-    landing_velocity: 0.5 # Positive value
+    align_descent_velocity: 0.15
+    landing_velocity: 0.5
+    search_velocity: 0.5
+    max_yaw_rate: 0.5
 
-    garra_timeout: 5.0
+    # === Tolerâncias ===
+    position_tolerance: 0.07
+    align_tolerance: 0.05         # Usado pelos align states
+    align_base_tolerance: 0.05    # Tolerância específica para bases
+    align_package_tolerance: 0.02 # Tolerância específica para packages
+    yaw_align_tolerance: 0.087    # ~5 graus para alinhamento rotacional
+
+    # === Timeouts ===
     detection_timeout: 10.0
     landing_timeout: 7.0
+    garra_timeout: 5.0
+    package_operation_timeout: 5.0
 
-    position_tolerance: 0.07
-    align_base_tolerance: 0.05
-    align_package_tolerance: 0.02
-
+    # === Controladores PID - Posição ===
     pid_pos_kp: 1.0
     pid_pos_ki: 0.01
     pid_pos_kd: 0.05
     setpoint: 0.0
 
-    known_base_radius: 1.5
+    # === Controladores PID - Yaw (para packages) ===
+    pid_yaw_kp: 2.0
+    pid_yaw_ki: 0.0
+    pid_yaw_kd: 0.1
+
+    # === Offsets de Alinhamento ===
+    base_align_offset_x: 0.05     # Offset da câmera para bases
+    base_align_offset_y: 0.02
+    package_align_offset_x: 0.15  # Offset da garra para packages
+    package_align_offset_y: 0.0
+
+    # === Parâmetros de Visão ===
     height_to_ground: 1.2
-    # -------------------------------------
+    mean_base_height: 0.0
+    mean_package_height: 0.1
+    known_base_radius: 1.5
+
+    # === Busca em Espiral ===
+    search_radius: 0.5            # Raio inicial da espiral
+    angle_increment: 0.5          # Incremento angular
+    max_radius: 5.0               # Raio máximo da espiral
+
+    # === Estados e Flags ===
+    initial_takeoff_taken: false   # Flag se já decolou
+    deliver_after_takeoff: false   # Flag para entregar após decolagem
+    package_state: "get_package"   # "get_package" ou "deliver_package"
+    package_operation: "pickup"    # "pickup" ou "drop"
+    are_there_packages_yet: false  # Flag se há packages detectados
+    current_waypoint_index: 0      # Índice do waypoint atual
+
+    # === Outras Configurações ===
+    descent_velocity: 0.15          # Velocidade de descida
 
 fase2_vision:
   ros__parameters:
