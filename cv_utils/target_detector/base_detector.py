@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 from typing import List, Dict, Tuple
 
-from .target_detector import TargetDetector, run_detector
+from target_detector import TargetDetector, run_detector
 
 
 class BaseDetector(TargetDetector):
@@ -256,8 +256,17 @@ class BaseDetector(TargetDetector):
 
 def main(args=None):
     """Main function for base detector"""
-    base_detector = BaseDetector()
-    run_detector(base_detector, args)
+    import rclpy
+    rclpy.init(args=args)
+    
+    try:
+        base_detector = BaseDetector()
+        rclpy.spin(base_detector)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

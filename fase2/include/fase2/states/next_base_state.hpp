@@ -13,7 +13,9 @@ public:
     std::string act(fsm::Blackboard &bb) override {
         (void) bb;
 
-        NextWaypoints::act(bb);
+        return NextWaypoints::act(bb);
+
+        this->drone->log("Searching for base by moving left...");
 
         if(this->vision->isThereDetection()) {
             this->drone->log("Base detected! Aligning...");
@@ -21,7 +23,7 @@ public:
         }
 
         // movendo um pouco para a esquerda
-        move_local_by_speed(this->drone, -1.0f, 0.0f, 0.0f);
+        move_local_by_speed(this->drone, 1.0f, 0.0f, 0.0f);
         
         return ""; // Continua procurando pela base
     }

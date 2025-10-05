@@ -104,6 +104,13 @@ public:
             {"SEG FAULT", "ERROR"}
         });
 
+        this->add_transitions("NEXT BASE", {
+            {"ARRIVED", "LANDING"},
+            {"NO MORE BASES", "LANDING"},
+            {"SEG FAULT", "ERROR"},
+            {"ALL DONE", "FINISHED"}
+        });
+
     }
 
 private:
@@ -254,7 +261,7 @@ public:
             {"deliver_after_takeoff", false},   // Flag para entregar após decolagem
             {"package_state", std::string("get_package")}, // "get_package" ou "deliver_package"
             {"package_operation", std::string("pickup")},  // "pickup" ou "drop"
-            {"are_there_packages_yet", false},  // Flag se há packages detectados
+            {"are_there_packages_yet", true},  // Flag se há packages detectados
             {"current_waypoint_index", 0.0},      // Índice do waypoint atual
 
             // === Outras Configurações ===

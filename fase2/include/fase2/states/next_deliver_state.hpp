@@ -13,7 +13,7 @@ public:
     std::string act(fsm::Blackboard &bb) override {
         (void) bb;
 
-        NextWaypoints::act(bb);
+        return NextWaypoints::act(bb);
 
         if(this->vision->isThereDetection()) {
             this->drone->log("Deliver base detected! Aligning...");

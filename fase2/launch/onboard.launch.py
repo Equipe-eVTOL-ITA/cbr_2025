@@ -16,6 +16,7 @@ def generate_launch_description():
     pkg_fase2       = get_package_share_directory('cbr_fase2')
     onboard_params  = os.path.join(pkg_fase2, "config", "onboard.yaml")
     fsm_params     = os.path.join(pkg_fase2, "config", "fsm.yaml")
+    vision_params   = os.path.join(pkg_fase2, "config", "vision.yaml")
 
     exec_arg = DeclareLaunchArgument(
         "mission",
@@ -47,13 +48,24 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Base detector node
+    # Base detector node (using new target_detector framework)
     base_detector_node = Node(
         package='cbr_cv_utils',
-        executable='base_detector',
-        parameters=[onboard_params],
+        executable='target_base_detector',
+        parameters=[vision_params],
         output='screen'
     )
+
+    # Package detector node (delayed slightly to avoid conflicts)
+    package_detector_node = Node(
+        package='cbr_cv_utils',
+        executable='target_package_detector',
+        parameters=[vision_params],
+        output='screen'
+    )
+
+    # Delay package detector by 1 second after base detector
+    delayed_package_detector = TimerAction(period=1.0, actions=[package_detector_node])
 
     fsm_node = Node(
         package='cbr_fase2',
@@ -70,5 +82,6 @@ def generate_launch_description():
         telemetry_recorder_node,        
         # camera_node,
         base_detector_node,
+        delayed_package_detector,
         delayed_fsm_node
     ])

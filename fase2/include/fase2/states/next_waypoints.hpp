@@ -42,6 +42,9 @@ public:
         
         std::vector<PairOfArenaPoints>& pairs = **pairs_ptr;
 
+        this->drone->log("Tamanho dos pares de waypoints: " + std::to_string(pairs.size()));
+        this->drone->log("Índice atual do waypoint: " + std::to_string(index));
+
         if(index >= static_cast<int>(pairs.size())){
             // acabaram as base
             bb.set<bool>("are_there_packages_yet", false);

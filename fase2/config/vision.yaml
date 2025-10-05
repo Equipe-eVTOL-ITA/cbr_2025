@@ -1,7 +1,8 @@
-# VisionNode Configuration for CBR 2025
-# This configuration enables detection of both landing pads and packages
+# Vision Configuration for CBR 2025 Fase2
+# Unified configuration file for target detectors and vision node
 
-vision_node:
+# VisionNode Configuration
+fase2_vision:
   ros__parameters:
     # Detection timeouts
     timeout: 10.0
@@ -50,7 +51,7 @@ vision_node:
 base_detector:
   ros__parameters:
     # Image topics
-    image_topic: "/vertical_camera/image_raw"
+    image_topic: "/vertical_camera"
     detection_topic: "/base_detector/detections"
     
     # Blue color HSV ranges
@@ -92,7 +93,7 @@ base_detector:
 package_detector:
   ros__parameters:
     # Image topics
-    image_topic: "/vertical_camera/image_raw"
+    image_topic: "/vertical_camera"
     detection_topic: "/package_detector/detections"
     
     # Gray color HSV ranges for packages

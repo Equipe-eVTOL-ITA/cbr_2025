@@ -6,8 +6,8 @@ fase2_fsm:
     fictual_home_z: -0.6 # Remember z points Down
     
     # Coordenadas das bases (A, B, C)
-    base_A_x: 3.0
-    base_A_y: -1.0
+    base_A_x: 0.0
+    base_A_y: -5.5
     base_B_x: 5.0
     base_B_y: -1.0
     base_C_x: 7.0
@@ -79,8 +79,8 @@ fase2_fsm:
     deliver_after_takeoff: false   # Flag para entregar após decolagem
     package_state: "get_package"   # "get_package" ou "deliver_package"
     package_operation: "pickup"    # "pickup" ou "drop"
-    are_there_packages_yet: false  # Flag se há packages detectados
-    current_waypoint_index: 0      # Índice do waypoint atual
+    are_there_packages_yet: true  # Flag se há packages a serem ainda detectados
+    current_waypoint_index: 0.0      # Índice do waypoint atual
 
     # === Outras Configurações ===
     descent_velocity: 0.15          # Velocidade de descida
