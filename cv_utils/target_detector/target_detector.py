@@ -124,7 +124,7 @@ class TargetDetector(Node, ABC):
             detections_msg = self._create_detection_msg(detections, msg.header)
             self.detection_pub.publish(detections_msg)
 
-            # publish debug images if enables
+            # publish debug images if enabled
             self.image_debugger.publish(
                 msg=msg,
                 cv_image=cv_image,
