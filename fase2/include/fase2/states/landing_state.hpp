@@ -44,16 +44,28 @@ public:
         Eigen::Vector3d pos = this->drone->getLocalPosition();
         this->vision->publishBaseDetection("confirmed_base", pos);
 
-        auto bases = blackboard.get<std::vector<Base>>("bases");
-        bases->push_back({pos, true});
+        auto bases_pousadas_ptr = blackboard.get<std::shared_ptr<std::vector<Base>>>("bases_pousadas");
+        
+        if(bases_pousadas_ptr == nullptr || *bases_pousadas_ptr == nullptr){
+            this->drone->log("ERROR: bases_pousadas is null in LandingState on_exit");
+            return;
+        }
 
-        drone->log("New base {" + std::to_string(bases->size()) + "}: " +
+        auto& bases_pousadas = **bases_pousadas_ptr;
+        bases_pousadas.push_back({pos, true});
+
+        this->drone->log("New base {" + std::to_string(bases_pousadas.size()) + "}: " +
                     std::to_string(pos.x()) + ", " + std::to_string(pos.y()) + ", " + std::to_string(pos.z()));
 
-        if (bases->size() == 7){
+        this->drone->log("DEBUG: About to check if bases_pousadas.size() == 6");
+        
+        if (bases_pousadas.size() == 6){
+            this->drone->log("DEBUG: Setting finished_bases to true");
             blackboard.set<bool>("finished_bases", true);
-            drone->log("Visited all 6 bases");
+            this->drone->log("Visited all 6 bases");
         }
+        
+        this->drone->log("DEBUG: Exiting LandingState::on_exit successfully");
     }
 
 private:

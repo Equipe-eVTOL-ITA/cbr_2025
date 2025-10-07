@@ -14,17 +14,12 @@
  */
 class AlignPackageState : public AlignState {
 public:
-    AlignPackageState() : AlignState() {
-        // current_phase já é inicializada na declaração como ROUGH_POSITION
-    }
+    AlignPackageState() : AlignState() {}
 
 protected:
-    /**
-     * Configura offset específico para alinhamento com packages.
-     * O offset considera a diferença entre a posição da garra e o centro do drone.
-     */
+    
+    // configurar o offset entre a garra e o centro do drone
     void configureOffset(fsm::Blackboard &bb) override {
-        // Carregar offset específico para packages (posição da garra)
         float package_offset_x = 0.0f; // metros - frente/trás
         float package_offset_y = 0.0f; // metros - esquerda/direita
         
@@ -32,73 +27,61 @@ protected:
             package_offset_x = *bb.get<float>("package_align_offset_x");
             package_offset_y = *bb.get<float>("package_align_offset_y");
         } catch (...) {
-            // Se não encontrar os parâmetros específicos, usar offsets padrão da garra
+            // usando offsets padrão se não encontrar os outros
             this->drone->log("Using default package alignment offsets");
         }
         
         this->offset = Eigen::Vector2d(package_offset_x, package_offset_y);
         
-        // Carregar parâmetros específicos para packages
         this->mean_package_height = *bb.get<float>("mean_package_height");
         this->yaw_align_tolerance = *bb.get<float>("yaw_align_tolerance");
         this->max_yaw_rate = *bb.get<float>("max_yaw_rate");
         
-        // Configurar PID para controle de yaw
+        // constantes PID no yaw
         float yaw_kp = *bb.get<float>("pid_yaw_kp");
         float yaw_ki = *bb.get<float>("pid_yaw_ki");
         float yaw_kd = *bb.get<float>("pid_yaw_kd");
         this->yaw_pid = PidController(yaw_kp, yaw_ki, yaw_kd, 0.0f);
-        
-        this->drone->log("Package alignment configured with grappler offset: [" + 
-                        std::to_string(this->offset.x()) + ", " + 
-                        std::to_string(this->offset.y()) + "]");
     }
-    
-    /**
-     * Retorna o tipo de alinhamento para logs.
-     */
+
+    // tipo de alinhamento para logs
     std::string getAlignmentType() const override {
         return "PACKAGE";
     }
 
 public:
-    /**
-     * Implementa lógica específica de alinhamento com packages.
-     * Inclui alinhamento rotacional para packages retangulares.
-     */
+
+    // especifica o alinhamento para o caso dos packages
     std::string act(fsm::Blackboard &bb) override {
-        // Chama a implementação padrão da classe base
-        AlignState::act(bb);
         
-        // Implementação específica para packages com alinhamento sequencial
+        AlignState::act(bb); // ja atualiza pos e orientacao
+        
         float current_yaw = this->orientation[2];
         
-        // Debug info periódico
+        // debug periodico
         if (this->print_counter % 5 == 0) {
             std::string phase_name = getPhaseString(this->current_phase);
             this->drone->log("Package alignment - Phase: " + phase_name + ", yaw=" + std::to_string(current_yaw));
             updateDebugInfo();
         }
 
-        // Verificar timeout de detecção
+        // verifica timeout de detecção
         if (this->vision->lastPackageDetectionTime() > this->detection_timeout) {
             this->drone->log("PACKAGE DETECTION TIMEOUT EXCEEDED: " + std::to_string(this->detection_timeout) + "s.");
             return "LOST PACKAGE";
         }
 
-        // Verificar se há detecção de package
         if (this->vision->isTherePackageDetection()) {
             this->total_detected++;
             this->no_detection_counter = 0;
 
-            // Obter informações do package
-            // Obter bbox primeiro
+            // bbox do package
             auto package_bbox = this->vision->getClosestPackageBbox();
             
-            // MÉTODO SIMPLES DE DEBUG: Calcular posição baseado apenas na proporção da tela
+            // calcula a posição baseado apenas na proporção da tela
             this->approx_target = calculateSimpleTargetPosition(package_bbox);
-            
-            // Debug detalhado da detecção de package
+
+            // Debug detalhado da detecção do package
             if (this->print_counter % 5 == 0) {
                 this->drone->log("Package Detection - bbox center: [" + 
                                std::to_string(package_bbox.center_x) + ", " + 
@@ -115,14 +98,15 @@ public:
                                std::to_string(this->approx_target.z()) + "]");
             }
 
-            // Executar alinhamento sequencial baseado na fase atual
+            // alinhamento sequencial é: alinhar x,y com o centro -> alinhar orientação -> alinhar x,y com offset
             return executeSequentialAlignment(package_bbox);
 
-        } else {
-            // Sem detecção
+        }
+        else {
             this->total_undetected++;
             this->no_detection_counter++;
             
+            // isso pode proteger de perder o package quando estiver rotacionando
             if (this->no_detection_counter > 3) {
                 this->drone->log("No package detection found. Returning to initial yaw.");
                 this->drone->setLocalPosition(this->pos.x(), this->pos.y(), this->pos.z(), this->initial_yaw);
@@ -134,17 +118,16 @@ public:
     }
 
 private:
-    // Parâmetros específicos para alinhamento com packages
-    private:
+
     float mean_package_height = 0.06f;
     float hook_offset = 0.1f;
     float package_yaw_factor = 0.5f;
     float yaw_align_tolerance = 0.1f;
     float max_yaw_rate = 1.0f;
 
-    // Estados do alinhamento sequencial
+    // estados do alinhamento sequencial
     enum class AlignmentPhase {
-        ROUGH_POSITION,     // Fase 1: Alinhamento grosseiro de posição (X,Y)
+        ROUGH_POSITION,     // Fase 1: Alinhamento de posição (X,Y) com o centro
         YAW_ALIGNMENT,      // Fase 2: Alinhamento de rotação (Yaw)
         FINE_POSITION       // Fase 3: Alinhamento fino com offset
     };
@@ -152,7 +135,6 @@ private:
     AlignmentPhase current_phase = AlignmentPhase::ROUGH_POSITION;
     PidController yaw_pid;
 
-    // Métodos para alinhamento sequencial
     std::string executeSequentialAlignment(const BoundingBox& package_bbox) {
         switch (this->current_phase) {
             case AlignmentPhase::ROUGH_POSITION:
@@ -263,29 +245,24 @@ private:
         }
     }
 
-    /**
-     * Normaliza erro de yaw para [-π, π].
-     */
+    // normaliza erro de yaw para [-π, π]
     float normalizeYawError(float yaw_error) {
         while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
         while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
         return yaw_error;
     }
 
-    /**
-     * Método para calcular posição do target baseado na proporção da imagem.
-     * Considera a rotação atual do drone para mapeamento correto de coordenadas.
-     */
+    // posicao do target baseado na proporção da imagem
     Eigen::Vector3d calculateSimpleTargetPosition(const BoundingBox& package_bbox) {
-        // PROTEÇÃO: Validar dados de entrada
+
+        // validando a entrada
         if (!std::isfinite(package_bbox.center_x) || !std::isfinite(package_bbox.center_y) ||
             package_bbox.center_x < 0.0f || package_bbox.center_x > 1.0f ||
             package_bbox.center_y < 0.0f || package_bbox.center_y > 1.0f) {
             this->drone->log("ERROR: Invalid bbox coordinates detected!");
-            return this->pos; // Retornar posição atual como fallback
+            return this->pos; // posição atual como fallback
         }
         
-        // Calcular deslocamento baseado na diferença do centro da imagem
         float center_x_norm = package_bbox.center_x; // [0, 1]
         float center_y_norm = package_bbox.center_y; // [0, 1]
         
@@ -303,10 +280,10 @@ private:
         image_offset_x = std::clamp(image_offset_x, -2.0f, 2.0f);
         image_offset_y = std::clamp(image_offset_y, -2.0f, 2.0f);
         
-        // CORREÇÃO PRINCIPAL: Aplicar rotação baseada no yaw atual do drone
+        // Aplicar rotação baseada no yaw atual do drone
         float current_yaw = this->orientation[2];
         
-        // CORREÇÃO FINAL: Mapeamento correto de coordenadas
+        // Mapeamento de coordenadas
         // Para câmera apontando para baixo:
         // - Y da imagem (baixo) → X do drone (frente): INVERTER (para convergir)
         // - X da imagem (direita) → Y do drone (direita): MANTER (para convergir)
@@ -316,8 +293,8 @@ private:
         // Aplicar rotação do yaw para converter para coordenadas globais
         float cos_yaw = std::cos(current_yaw);
         float sin_yaw = std::sin(current_yaw);
-        
-        // PROTEÇÃO: Verificar se os valores trigonométricos são válidos
+
+        // Verificar se os valores trigonométricos são válidos
         if (!std::isfinite(cos_yaw) || !std::isfinite(sin_yaw)) {
             this->drone->log("ERROR: Invalid trigonometric values!");
             return this->pos; // Retornar posição atual como fallback
@@ -325,8 +302,8 @@ private:
         
         float world_offset_x = drone_frame_x * cos_yaw - drone_frame_y * sin_yaw;
         float world_offset_y = drone_frame_x * sin_yaw + drone_frame_y * cos_yaw;
-        
-        // PROTEÇÃO: Limitar offsets finais para evitar valores extremos
+
+        // Limitar offsets finais para evitar valores extremos
         world_offset_x = std::clamp(world_offset_x, -5.0f, 5.0f);
         world_offset_y = std::clamp(world_offset_y, -5.0f, 5.0f);
         
@@ -334,11 +311,11 @@ private:
         float world_x = this->pos.x() + world_offset_x;
         float world_y = this->pos.y() + world_offset_y;
         float world_z = 0.0f; // Package no chão
-        
-        // PROTEÇÃO: Verificar se o resultado é válido
+
+        // Verificar se o resultado é válido
         if (!std::isfinite(world_x) || !std::isfinite(world_y)) {
             this->drone->log("ERROR: Invalid world coordinates calculated!");
-            return this->pos; // Retornar posição atual como fallback
+            return this->pos; // posição atual como fallback
         }
         
         // Debug do cálculo
@@ -366,7 +343,7 @@ private:
         float bbox_rotation = package_bbox.rotation;
         
         // Converter rotação da bbox para orientação desejada do drone
-        // Adicionando 90 graus (π/2) para a esquerda em relação ao alinhamento original
+        // Adicionando 90 graus (π/2) em relação ao alinhamento original
         float desired_yaw = this->initial_yaw + bbox_rotation - M_PI/2.0;
         
         // Normalizar para [-π, π]

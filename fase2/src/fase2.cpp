@@ -79,6 +79,10 @@ public:
         std::shared_ptr<std::vector<PairOfArenaPoints>> pairs = std::make_shared<std::vector<PairOfArenaPoints>>(this->config_pair_of_waypoints('A', 'C')); // 3 pacotes
         this->blackboard_set<std::shared_ptr<std::vector<PairOfArenaPoints>>>("waypoint_pairs", pairs);
 
+        // lista de bases que já foram pousadas
+        std::shared_ptr<std::vector<Base>> bases_pousadas = std::make_shared<std::vector<Base>>();
+        this->blackboard_set<std::shared_ptr<std::vector<Base>>>("bases_pousadas", bases_pousadas);
+
 
         // configura os waypoints para busca em espiral
         // na implementacao, somar à posicao do drone

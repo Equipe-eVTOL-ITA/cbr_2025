@@ -13,13 +13,7 @@ public:
     AlignBaseState() : AlignState() {}
 
 protected:
-    /**
-     * Configura offset específico para alinhamento com bases.
-     * O offset considera a diferença entre a posição da câmera e o centro do drone.
-     */
     void configureOffset(fsm::Blackboard &bb) override {
-        // Carregar offset específico para bases do blackboard
-        // Se não especificado, usar offset padrão da câmera
         float base_offset_x = 0.0f; // metros
         float base_offset_y = 0.0f; // metros
         
@@ -27,13 +21,13 @@ protected:
             base_offset_x = *bb.get<float>("base_align_offset_x");
             base_offset_y = *bb.get<float>("base_align_offset_y");
         } catch (...) {
-            // Se não encontrar os parâmetros específicos, usar offsets padrão
+            // usar os offsets padrão se não encontrar os outros
             this->drone->log("Using default base alignment offsets");
         }
         
         this->offset = Eigen::Vector2d(base_offset_x, base_offset_y);
         
-        // Carregar parâmetros específicos para bases
+        // parâmetros específicos para bases
         this->height_to_ground = *bb.get<float>("height_to_ground");
         this->mean_base_height = *bb.get<float>("mean_base_height");
         this->package_state = *bb.get<std::string>("package_state");
@@ -47,50 +41,38 @@ protected:
         }
     }
     
-    /**
-     * Retorna o tipo de alinhamento para logs.
-     */
     std::string getAlignmentType() const override {
         return "BASE";
     }
 
 public:
-
-    /**
-     * Implementa lógica específica de alinhamento com bases.
-     * Usa detecções de base do VisionNode e aplica offset específico.
-     */
     std::string act(fsm::Blackboard &bb) override {
-        // Chama a implementação padrão da classe base
+
         AlignState::act(bb);
         
-        // Implementação específica para bases
-        // (posição e orientação já atualizadas pela classe base)
-        float yaw = this->orientation[2];
+        float yaw = this->orientation[2]; // pos e orientação já são atualizadas pela classe base
         
-        // Debug info periódico
+        // debug periódico
         if (this->print_counter % 5 == 0) {
             this->drone->log("Base alignment - yaw=" + std::to_string(yaw));
             updateDebugInfo();
         }
 
-        // Verificar timeout de detecção
+        // verificar timeout
         if (this->vision->lastBaseDetectionTime() > this->detection_timeout) {
             this->drone->log("BASE DETECTION TIMEOUT EXCEEDED: " + std::to_string(this->detection_timeout) + "s.");
             return "LOST BASE";
         }
 
-        // Verificar se há detecção de base
         if (this->vision->isThereBaseDetection()) {
             this->total_detected++;
             this->no_detection_counter = 0;
 
-            // Obter posição da base mais próxima usando VisionNode
             this->approx_target = this->vision->getClosestBasePosition(
                 this->pos, this->orientation, this->mean_base_height, true
             );
 
-            // Calcular target considerando offset
+            // calcular target considerando offset
             Eigen::Vector2d target_with_offset = calculateTargetWithOffset(this->approx_target);
             Eigen::Vector2d current_pos_2d = this->pos.head<2>();
             Eigen::Vector2d alignment_error = target_with_offset - current_pos_2d;
@@ -100,7 +82,6 @@ public:
             // Publicar detecção da base para telemetria
             this->vision->publishBaseDetection("detected_base", this->approx_target, this->mean_base_height);
 
-            // Verificar se está alinhado
             if (isAligned(alignment_error)) {
                 this->aligned_counter++;
                 if (this->aligned_counter > 10) {
@@ -110,11 +91,10 @@ public:
                 this->aligned_counter = 0;
             }
 
-            // Calcular comandos PID
+            // PID
             float x_rate = this->x_pid.compute(this->setpoint - alignment_error.x());
             float y_rate = this->y_pid.compute(this->setpoint - alignment_error.y());
 
-            // Aplicar comandos de velocidade
             applyVelocityCommands(x_rate, y_rate);
 
             if (this->print_counter % 5 == 0) {
@@ -125,7 +105,7 @@ public:
             }
 
         } else {
-            // Sem detecção
+            // sem detecção
             this->total_undetected++;
             this->no_detection_counter++;
             
@@ -140,7 +120,7 @@ public:
     }
 
 private:
-    // Parâmetros específicos para alinhamento com bases
+    // parâmetros específicos
     float height_to_ground;
     float mean_base_height;
     std::string package_state;

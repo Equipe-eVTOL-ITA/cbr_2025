@@ -32,10 +32,7 @@ public:
 
     virtual ~AlignState() = default;
 
-    /**
-     * Inicialização comum para todos os estados de alinhamento.
-     * Carrega parâmetros do blackboard e configura controladores PID.
-     */
+    // carrega parâmetros do blackboard e configura controladores PID.
     void on_enter(fsm::Blackboard &bb) override {
         this->drone = *bb.get<std::shared_ptr<Drone>>("drone");
         this->vision = *bb.get<std::shared_ptr<VisionNode>>("vision");
@@ -44,52 +41,41 @@ public:
 
         this->drone->log("STATE: ALIGN - " + getAlignmentType());
 
-        // Carregar parâmetros do blackboard
-        loadParameters(bb);
+        loadParameters(bb); // parametros da blackboard
         
-        // Inicializar variáveis auxiliares
-        initializeCounters();
+        initializeCounters(); // variaveis aux
         
-        // Configurar controladores PID
-        setupPidControllers();
+        setupPidControllers(); // config PID
         
-        // Configurar offset específico do tipo de objeto
-        configureOffset(bb);
+        configureOffset(bb); // offset específico para cada implementação
         
         this->drone->log("Alignment configured with offset: [" + 
                         std::to_string(this->offset.x()) + ", " + 
                         std::to_string(this->offset.y()) + "]");
     }
 
-    /**
-     * Implementação padrão do método act que pode ser chamada pelas classes derivadas.
-     * Implementa a lógica comum de alinhamento que deve ser complementada pelas classes filhas.
-     */
+    // implementação padrão que pode ser invocada pelas classes derivadas
+    // lógica comum de alinhamento
     virtual std::string act(fsm::Blackboard &bb) {
         (void) bb;
        
-        // Implementação padrão comum para todos os estados de alinhamento
-        this->print_counter++;
+        this->print_counter++; // padrão para todos os estados de alinhamento
         
-        // Atualizar posição e orientação do drone
+        // atualizar posição e orientação do drone
         this->pos = this->drone->getLocalPosition();
         this->orientation = this->drone->getOrientation();
         
-        // Log periódico de debug
         updateDebugInfo();
         
-        // Retorna string vazia por padrão - classes derivadas devem complementar
         return "";
     }
 
 protected:
-    // === Membros protegidos para acesso das classes derivadas ===
     
-    // Objetos principais
     std::shared_ptr<Drone> drone;
     std::shared_ptr<VisionNode> vision;
 
-    // Atributos físicos
+    // atributos físicos
     float align_tolerance;
     float max_velocity;
     float align_descent_velocity;
@@ -98,11 +84,11 @@ protected:
     Eigen::Vector3d orientation;
     Eigen::Vector3d approx_target; // pode ser base ou package
 
-    // Variáveis PID
+    // PID
     float kp, ki, kd, setpoint;
     PidController x_pid, y_pid;
 
-    // Variáveis auxiliares
+    // variáveis aux
     int print_counter;
     int no_detection_counter;
     int aligned_counter;
@@ -110,37 +96,26 @@ protected:
     int total_undetected;
     float horizontal_distance;
 
-    // Timeout
+    // timeout
     float detection_timeout;
     
-    // Offset específico para cada tipo de objeto
+    // offset específico para cada tipo de objeto
     Eigen::Vector2d offset;
 
-    // === Métodos protegidos para uso das classes derivadas ===
-    
-    /**
-     * Configura o offset específico para o tipo de objeto.
-     * Deve ser sobrescrito pelas classes derivadas.
-     */
+
+    // configura o offset específico para o tipo de objeto
     virtual void configureOffset(fsm::Blackboard &bb) = 0;
     
-    /**
-     * Retorna o tipo de alinhamento para logs.
-     * Deve ser sobrescrito pelas classes derivadas.
-     */
+    // retorna o tipo de alinhamento
     virtual std::string getAlignmentType() const = 0;
     
-    /**
-     * Calcula a posição do target considerando o offset configurado.
-     */
+    // considera o offset para calcular o target final
     Eigen::Vector2d calculateTargetWithOffset(const Eigen::Vector3d& detected_target) {
         Eigen::Vector2d target_2d = detected_target.head<2>();
         return target_2d + this->offset;
     }
     
-    /**
-     * Aplica os comandos de velocidade considerando limites máximos.
-     */
+    // aplica os comandos de velocidade considerando limites máximos
     void applyVelocityCommands(float x_rate, float y_rate, float z_rate = 0.0f, float yaw_rate = 0.0f) {
         // Limitar velocidade horizontal ao máximo configurado
         Eigen::Vector2d horizontal_rate(x_rate, y_rate);
@@ -151,16 +126,11 @@ protected:
         this->drone->setLocalVelocity(horizontal_rate.x(), horizontal_rate.y(), z_rate, yaw_rate);
     }
     
-    /**
-     * Verifica se o alinhamento está dentro da tolerância.
-     */
+    // verifica alinhamento com tolerancia
     bool isAligned(const Eigen::Vector2d& error) {
         return error.norm() < this->align_tolerance;
     }
     
-    /**
-     * Atualiza contadores e logs de debug.
-     */
     void updateDebugInfo() {
         if (this->print_counter % 5 == 0) {
             this->drone->log("Position: [" + std::to_string(this->pos.x()) + ", " + 
@@ -172,9 +142,7 @@ protected:
     }
 
 private:
-    /**
-     * Carrega parâmetros do blackboard.
-     */
+    // parâmetros do blackboard
     void loadParameters(fsm::Blackboard &bb) {
         this->detection_timeout = *bb.get<float>("detection_timeout");
         this->align_tolerance = *bb.get<float>("align_tolerance");
@@ -188,9 +156,7 @@ private:
         this->setpoint = *bb.get<float>("setpoint");
     }
     
-    /**
-     * Inicializa contadores e variáveis auxiliares.
-     */
+    // contadores e var aux
     void initializeCounters() {
         this->print_counter = 0;
         this->no_detection_counter = 0;
@@ -199,10 +165,8 @@ private:
         this->total_detected = 0;
         this->total_undetected = 0;
     }
-    
-    /**
-     * Configura controladores PID.
-     */
+
+    // configura controladores PID
     void setupPidControllers() {
         this->x_pid = PidController(this->kp, this->ki, this->kd, this->setpoint);
         this->y_pid = PidController(this->kp, this->ki, this->kd, this->setpoint);
