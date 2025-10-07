@@ -37,7 +37,7 @@ private:
     bool search_base() {
         // Implementar lógica de busca pela base
         // movendo um pouco para a esquerda
-        move_local_by_speed(this->drone, 1.0f, 0.0f, 0.0f);
+        //move_local_by_speed(this->drone, 1.0f, 0.0f, 0.0f);
 
         return true;
     }

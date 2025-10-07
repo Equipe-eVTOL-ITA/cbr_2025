@@ -66,7 +66,7 @@ fase2_fsm:
     # === Parâmetros de Visão ===
     height_to_ground: 1.2
     mean_base_height: 0.0
-    mean_package_height: 0.0  # Packages no chão
+    mean_package_height: 0.1
     known_base_radius: 1.5
 
     # === Busca em Espiral ===
@@ -91,9 +91,8 @@ fase2_vision:
     
     # === Parâmetros de Calibração da Câmera ===
     # Camera intrinsics for 800x800 published image
-    # 1231.962
-    fx: 600.0  # Focal length X (mais conservador)
-    fy: 600.0  # Focal length Y (mais conservador)
+    fx: 1231.962  # Focal length X
+    fy: 1231.962  # Focal length Y  
     cx: 400.0     # Principal point X (center)
     cy: 400.0     # Principal point Y (center)
     
@@ -109,9 +108,9 @@ fase2_vision:
     dist_k3: 0.0
     
     # === Extrinsics: Camera pose in BODY (FRD) frame ===
-    # For downward-facing camera: try different orientation
+    # For downward-facing camera: 90° pitch rotation
     camera_roll: 0.0      # No roll rotation
-    camera_pitch: 0.0     # Try no pitch first to debug
+    camera_pitch: 1.5708  # 90° pitch down (π/2 radians)
     camera_yaw: 0.0       # No yaw rotation
     camera_tx: 0.0        # No translation in X (forward)
     camera_ty: 0.0        # No translation in Y (right)  

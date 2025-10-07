@@ -273,40 +273,85 @@ private:
     }
 
     /**
-     * Método simples para calcular posição do target baseado na proporção da imagem.
-     * Assume que o centro da imagem corresponde à posição atual do drone.
+     * Método para calcular posição do target baseado na proporção da imagem.
+     * Considera a rotação atual do drone para mapeamento correto de coordenadas.
      */
     Eigen::Vector3d calculateSimpleTargetPosition(const BoundingBox& package_bbox) {
+        // PROTEÇÃO: Validar dados de entrada
+        if (!std::isfinite(package_bbox.center_x) || !std::isfinite(package_bbox.center_y) ||
+            package_bbox.center_x < 0.0f || package_bbox.center_x > 1.0f ||
+            package_bbox.center_y < 0.0f || package_bbox.center_y > 1.0f) {
+            this->drone->log("ERROR: Invalid bbox coordinates detected!");
+            return this->pos; // Retornar posição atual como fallback
+        }
+        
         // Calcular deslocamento baseado na diferença do centro da imagem
         float center_x_norm = package_bbox.center_x; // [0, 1]
         float center_y_norm = package_bbox.center_y; // [0, 1]
         
         // Converter para offset em metros baseado na altura do drone
         float drone_height = std::abs(this->pos.z()); // Altura positiva
-        float fov_scale = drone_height * 0.2f; // Campo de visão mais conservador
+        if (drone_height < 0.1f) drone_height = 2.5f; // Fallback para altura padrão
+        float fov_scale = drone_height * 0.3f; // Ajustar escala se necessário
         
         // Calcular offset em relação ao centro da imagem (0.5, 0.5)
-        float offset_x = (center_x_norm - 0.5f) * fov_scale * 2.0f; // Escala para metros
-        float offset_y = (center_y_norm - 0.5f) * fov_scale * 2.0f;
+        // COORDENADAS DA IMAGEM: X=direita, Y=baixo
+        float image_offset_x = (center_x_norm - 0.5f) * fov_scale * 2.0f; // Direita = positivo
+        float image_offset_y = (center_y_norm - 0.5f) * fov_scale * 2.0f; // Baixo = positivo
         
         // Limitar offsets para evitar valores extremos
-        offset_x = std::clamp(offset_x, -2.0f, 2.0f);
-        offset_y = std::clamp(offset_y, -2.0f, 2.0f);
+        image_offset_x = std::clamp(image_offset_x, -2.0f, 2.0f);
+        image_offset_y = std::clamp(image_offset_y, -2.0f, 2.0f);
         
-        // Teste de mapeamento corrigido:
-        // - X da imagem corresponde diretamente a X do mundo (frente)
-        // - Y da imagem corresponde diretamente a Y do mundo (direita)
-        float world_x = this->pos.x() + offset_x;  // X da imagem -> X do mundo
-        float world_y = this->pos.y() + offset_y;  // Y da imagem -> Y do mundo
+        // CORREÇÃO PRINCIPAL: Aplicar rotação baseada no yaw atual do drone
+        float current_yaw = this->orientation[2];
+        
+        // CORREÇÃO FINAL: Mapeamento correto de coordenadas
+        // Para câmera apontando para baixo:
+        // - Y da imagem (baixo) → X do drone (frente): INVERTER (para convergir)
+        // - X da imagem (direita) → Y do drone (direita): MANTER (para convergir)
+        float drone_frame_x = -image_offset_y;  // Baixo na imagem = movimento PARA FRENTE
+        float drone_frame_y = image_offset_x;   // Direita na imagem = movimento PARA DIREITA
+        
+        // Aplicar rotação do yaw para converter para coordenadas globais
+        float cos_yaw = std::cos(current_yaw);
+        float sin_yaw = std::sin(current_yaw);
+        
+        // PROTEÇÃO: Verificar se os valores trigonométricos são válidos
+        if (!std::isfinite(cos_yaw) || !std::isfinite(sin_yaw)) {
+            this->drone->log("ERROR: Invalid trigonometric values!");
+            return this->pos; // Retornar posição atual como fallback
+        }
+        
+        float world_offset_x = drone_frame_x * cos_yaw - drone_frame_y * sin_yaw;
+        float world_offset_y = drone_frame_x * sin_yaw + drone_frame_y * cos_yaw;
+        
+        // PROTEÇÃO: Limitar offsets finais para evitar valores extremos
+        world_offset_x = std::clamp(world_offset_x, -5.0f, 5.0f);
+        world_offset_y = std::clamp(world_offset_y, -5.0f, 5.0f);
+        
+        // Posição final no mundo
+        float world_x = this->pos.x() + world_offset_x;
+        float world_y = this->pos.y() + world_offset_y;
         float world_z = 0.0f; // Package no chão
+        
+        // PROTEÇÃO: Verificar se o resultado é válido
+        if (!std::isfinite(world_x) || !std::isfinite(world_y)) {
+            this->drone->log("ERROR: Invalid world coordinates calculated!");
+            return this->pos; // Retornar posição atual como fallback
+        }
         
         // Debug do cálculo
         if (this->print_counter % 10 == 0) {
-            this->drone->log("SIMPLE_CALC: bbox_center=[" + std::to_string(center_x_norm) + 
-                           ", " + std::to_string(center_y_norm) + "], offset=[" +
-                           std::to_string(offset_x) + ", " + std::to_string(offset_y) + 
-                           "], height=" + std::to_string(drone_height) + 
-                           ", scale=" + std::to_string(fov_scale));
+            this->drone->log("TARGET_CALC: bbox=[" + std::to_string(center_x_norm) + 
+                           "," + std::to_string(center_y_norm) + "], img_offset=[" +
+                           std::to_string(image_offset_x) + "," + std::to_string(image_offset_y) + 
+                           "], drone_frame=[" + std::to_string(drone_frame_x) + "," + 
+                           std::to_string(drone_frame_y) + "], yaw=" + 
+                           std::to_string(current_yaw * 180.0 / M_PI) + "°");
+            this->drone->log("WORLD_TARGET: [" + std::to_string(world_x) + "," + 
+                           std::to_string(world_y) + "] from drone_pos=[" + 
+                           std::to_string(this->pos.x()) + "," + std::to_string(this->pos.y()) + "]");
         }
         
         return Eigen::Vector3d(world_x, world_y, world_z);
@@ -321,8 +366,8 @@ private:
         float bbox_rotation = package_bbox.rotation;
         
         // Converter rotação da bbox para orientação desejada do drone
-        // Assumindo que queremos alinhar com o eixo longitudinal do package
-        float desired_yaw = this->initial_yaw + bbox_rotation;
+        // Adicionando 90 graus (π/2) para a esquerda em relação ao alinhamento original
+        float desired_yaw = this->initial_yaw + bbox_rotation - M_PI/2.0;
         
         // Normalizar para [-π, π]
         while (desired_yaw > M_PI) desired_yaw -= 2.0 * M_PI;
