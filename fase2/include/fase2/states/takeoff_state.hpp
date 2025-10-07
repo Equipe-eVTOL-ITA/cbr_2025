@@ -49,7 +49,18 @@ public:
         (void) bb;
 
         this->pos = this->drone->getLocalPosition();
+        
+        // Recalcular goal baseado na posição atual para evitar problemas após pouso
+        float takeoff_height = *bb.get<float>("takeoff_height");
+        this->goal = Eigen::Vector3d({this->pos[0], this->pos[1], takeoff_height});
+        
         Eigen::Vector3d diff = this->goal - this->pos;
+        
+        this->drone->log("TAKEOFF: pos=[" + std::to_string(this->pos[0]) + "," + 
+                        std::to_string(this->pos[1]) + "," + std::to_string(this->pos[2]) + 
+                        "], goal=[" + std::to_string(this->goal[0]) + "," + 
+                        std::to_string(this->goal[1]) + "," + std::to_string(this->goal[2]) + 
+                        "], diff_norm=" + std::to_string(diff.norm()));
 
         if(diff.norm() < this->position_tolerance) {
             if(!this->take_off_taken) {
