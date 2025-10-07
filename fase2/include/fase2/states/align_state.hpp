@@ -24,7 +24,7 @@
  */
 class AlignState : public fsm::State {
 public:
-    AlignState() : fsm::State(), x_pid(0,0,0,0,0.05), y_pid(0,0,0,0,0.05) {
+    AlignState() : fsm::State(), x_pid(0.0, 0.0, 0.0, 0.0, 0.05), y_pid(0.0, 0.0, 0.0, 0.0, 0.05) {
         this->drone = nullptr;
         this->vision = nullptr;
         this->offset = Eigen::Vector2d::Zero();
@@ -62,10 +62,25 @@ public:
     }
 
     /**
-     * Método virtual puro que deve ser implementado por cada estado derivado.
-     * Implementa a lógica específica de alinhamento para cada tipo de objeto.
+     * Implementação padrão do método act que pode ser chamada pelas classes derivadas.
+     * Implementa a lógica comum de alinhamento que deve ser complementada pelas classes filhas.
      */
-    virtual std::string act(fsm::Blackboard &bb) = 0;
+    virtual std::string act(fsm::Blackboard &bb) {
+        (void) bb;
+       
+        // Implementação padrão comum para todos os estados de alinhamento
+        this->print_counter++;
+        
+        // Atualizar posição e orientação do drone
+        this->pos = this->drone->getLocalPosition();
+        this->orientation = this->drone->getOrientation();
+        
+        // Log periódico de debug
+        updateDebugInfo();
+        
+        // Retorna string vazia por padrão - classes derivadas devem complementar
+        return "";
+    }
 
 protected:
     // === Membros protegidos para acesso das classes derivadas ===

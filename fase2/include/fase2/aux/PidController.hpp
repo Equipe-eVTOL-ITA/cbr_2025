@@ -1,7 +1,15 @@
 #pragma once
 
+#include <chrono>
+
 class PidController {
 public:
+    // Default constructor
+    PidController() 
+        : kp_(0.0), ki_(0.0), kd_(0.0), setpoint_(0.0), sample_time_(0.05),
+          integral_(0.0), previous_error_(0.0), previous_time_(std::chrono::high_resolution_clock::now()) {}
+    
+    // Parameterized constructor
     PidController(float kp, float ki, float kd, float setpoint, float sample_time = 0.05)
         : kp_(kp), ki_(ki), kd_(kd), setpoint_(setpoint), sample_time_(sample_time),
           integral_(0.0), previous_error_(0.0), previous_time_(std::chrono::high_resolution_clock::now()) {}

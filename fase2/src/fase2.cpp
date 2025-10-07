@@ -16,6 +16,12 @@
 #include "fase2/states/arming_state.hpp"
 #include "fase2/states/takeoff_state.hpp"
 #include "fase2/states/next_base_state.hpp"
+#include "fase2/states/next_deliver_state.hpp"
+#include "fase2/states/align_base_state.hpp"
+#include "fase2/states/align_package_state.hpp"
+#include "fase2/states/landing_state.hpp"
+#include "fase2/states/package_state.hpp"
+#include "fase2/states/spiral_search_state.hpp"
 
 typedef std::map<std::string, std::variant<double, std::string, bool>> BlackboardMap;
 
@@ -88,6 +94,12 @@ public:
         this->add_state("ARMING", std::make_unique<ArmingState>());
         this->add_state("TAKEOFF", std::make_unique<TakeoffState>());
         this->add_state("NEXT BASE", std::make_unique<NextBaseState>());
+        this->add_state("NEXT DELIVER", std::make_unique<NextDeliverState>());
+        this->add_state("ALIGN TO BASE", std::make_unique<AlignBaseState>());
+        this->add_state("ALIGN TO PACKAGE", std::make_unique<AlignPackageState>());
+        this->add_state("LAND", std::make_unique<LandingState>());
+        this->add_state("PACKAGE", std::make_unique<PackageState>());
+        this->add_state("SPIRAL SEARCH", std::make_unique<SpiralSearchState>());
 
         this->set_initial_state("ARMING");
 
@@ -104,11 +116,42 @@ public:
             {"SEG FAULT", "ERROR"}
         });
 
+        this->add_transitions("LAND", {
+            {"LANDED", "PACKAGE"},
+            {"SEG FAULT", "ERROR"}
+        });
+
         this->add_transitions("NEXT BASE", {
-            {"ARRIVED", "LANDING"},
-            {"NO MORE BASES", "LANDING"},
-            {"SEG FAULT", "ERROR"},
-            {"ALL DONE", "FINISHED"}
+            {"ALIGN TO PACKAGE", "ALIGN TO PACKAGE"},
+            {"NOT FOUND", "ERROR"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("NEXT DELIVER", {
+            {"ALIGN TO DELIVER", "ALIGN TO BASE"},
+            {"NOT FOUND", "ERROR"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("SPIRAL SEARCH", {
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("ALIGN TO PACKAGE", {
+            {"ALIGNED", "LAND"},
+            {"LOST PACKAGE", "ERROR"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("ALIGN TO BASE", {
+            {"ALIGNED", "LAND"},
+            {"LOST BASE", "FINISHED"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("PACKAGE", {
+            {"DONE", "TAKEOFF"},
+            {"SEG FAULT", "ERROR"}
         });
 
     }

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <algorithm>
 #include "align_state.hpp"
+#include "fase2/aux/movement.hpp"
 
 /**
  * Estado de alinhamento específico para packages.
@@ -13,7 +14,9 @@
  */
 class AlignPackageState : public AlignState {
 public:
-    AlignPackageState() : AlignState() {}
+    AlignPackageState() : AlignState() {
+        // current_phase já é inicializada na declaração como ROUGH_POSITION
+    }
 
 protected:
     /**
@@ -64,17 +67,16 @@ public:
      * Inclui alinhamento rotacional para packages retangulares.
      */
     std::string act(fsm::Blackboard &bb) override {
-        (void) bb;
-        this->print_counter++;
-
-        // Atualizar posição e orientação do drone
-        this->pos = this->drone->getLocalPosition();
-        this->orientation = this->drone->getOrientation();
+        // Chama a implementação padrão da classe base
+        AlignState::act(bb);
+        
+        // Implementação específica para packages com alinhamento sequencial
         float current_yaw = this->orientation[2];
         
         // Debug info periódico
         if (this->print_counter % 5 == 0) {
-            this->drone->log("Package alignment - yaw=" + std::to_string(current_yaw));
+            std::string phase_name = getPhaseString(this->current_phase);
+            this->drone->log("Package alignment - Phase: " + phase_name + ", yaw=" + std::to_string(current_yaw));
             updateDebugInfo();
         }
 
@@ -89,58 +91,32 @@ public:
             this->total_detected++;
             this->no_detection_counter = 0;
 
-            // Obter posição do package mais próximo usando VisionNode
-            this->approx_target = this->vision->getClosestPackagePosition(
-                this->pos, this->orientation, this->mean_package_height, true
-            );
-
-            // Obter bbox do package para análise de orientação
+            // Obter informações do package
+            // Obter bbox primeiro
             auto package_bbox = this->vision->getClosestPackageBbox();
-
-            // Calcular target considerando offset da garra
-            Eigen::Vector2d target_with_offset = calculateTargetWithOffset(this->approx_target);
-            Eigen::Vector2d current_pos_2d = this->pos.head<2>();
-            Eigen::Vector2d alignment_error = target_with_offset - current_pos_2d;
-
-            this->horizontal_distance = alignment_error.norm();
-
-            // Calcular erro de yaw para alinhamento rotacional
-            float desired_yaw = calculateDesiredYaw(package_bbox);
-            float yaw_error = normalizeYawError(desired_yaw - current_yaw);
-
-            // Verificar se está alinhado (posição e rotação)
-            bool position_aligned = isAligned(alignment_error);
-            bool rotation_aligned = std::abs(yaw_error) < this->yaw_align_tolerance;
-
-            if (position_aligned && rotation_aligned) {
-                this->aligned_counter++;
-                if (this->aligned_counter > 10) {
-                    return "PRECISELY ALIGNED";
-                }
-            } else {
-                this->aligned_counter = 0;
-            }
-
-            // Calcular comandos PID para posição
-            float x_rate = this->x_pid.compute(this->setpoint - alignment_error.x());
-            float y_rate = this->y_pid.compute(this->setpoint - alignment_error.y());
-
-            // Calcular comando PID para yaw
-            float yaw_rate = this->yaw_pid.compute(-yaw_error);
-            yaw_rate = std::clamp(yaw_rate, -this->max_yaw_rate, this->max_yaw_rate);
-
-            // Aplicar comandos de velocidade incluindo yaw
-            applyVelocityCommands(x_rate, y_rate, 0.0f, yaw_rate);
-
+            
+            // MÉTODO SIMPLES DE DEBUG: Calcular posição baseado apenas na proporção da tela
+            this->approx_target = calculateSimpleTargetPosition(package_bbox);
+            
+            // Debug detalhado da detecção de package
             if (this->print_counter % 5 == 0) {
-                this->drone->log("Package target: [" + std::to_string(target_with_offset.x()) + 
-                               ", " + std::to_string(target_with_offset.y()) + "]");
-                this->drone->log("Position error: [" + std::to_string(alignment_error.x()) + 
-                               ", " + std::to_string(alignment_error.y()) + "]");
-                this->drone->log("Yaw error: " + std::to_string(yaw_error * 180.0 / M_PI) + " deg");
-                this->drone->log("Position aligned: " + std::string(position_aligned ? "YES" : "NO") + 
-                               ", Rotation aligned: " + std::string(rotation_aligned ? "YES" : "NO"));
+                this->drone->log("Package Detection - bbox center: [" + 
+                               std::to_string(package_bbox.center_x) + ", " + 
+                               std::to_string(package_bbox.center_y) + "], size: [" +
+                               std::to_string(package_bbox.width) + ", " + 
+                               std::to_string(package_bbox.height) + "], rotation: " +
+                               std::to_string(package_bbox.rotation * 180.0 / M_PI) + "°");
+                this->drone->log("Drone pos: [" + std::to_string(this->pos.x()) + 
+                               ", " + std::to_string(this->pos.y()) + ", " + 
+                               std::to_string(this->pos.z()) + "], orientation: " +
+                               std::to_string(this->orientation[2] * 180.0 / M_PI) + "°");
+                this->drone->log("Target pos: [" + std::to_string(this->approx_target.x()) + 
+                               ", " + std::to_string(this->approx_target.y()) + ", " + 
+                               std::to_string(this->approx_target.z()) + "]");
             }
+
+            // Executar alinhamento sequencial baseado na fase atual
+            return executeSequentialAlignment(package_bbox);
 
         } else {
             // Sem detecção
@@ -159,10 +135,182 @@ public:
 
 private:
     // Parâmetros específicos para alinhamento com packages
-    float mean_package_height;
-    float yaw_align_tolerance;
-    float max_yaw_rate;
+    private:
+    float mean_package_height = 0.06f;
+    float hook_offset = 0.1f;
+    float package_yaw_factor = 0.5f;
+    float yaw_align_tolerance = 0.1f;
+    float max_yaw_rate = 1.0f;
+
+    // Estados do alinhamento sequencial
+    enum class AlignmentPhase {
+        ROUGH_POSITION,     // Fase 1: Alinhamento grosseiro de posição (X,Y)
+        YAW_ALIGNMENT,      // Fase 2: Alinhamento de rotação (Yaw)
+        FINE_POSITION       // Fase 3: Alinhamento fino com offset
+    };
+    
+    AlignmentPhase current_phase = AlignmentPhase::ROUGH_POSITION;
     PidController yaw_pid;
+
+    // Métodos para alinhamento sequencial
+    std::string executeSequentialAlignment(const BoundingBox& package_bbox) {
+        switch (this->current_phase) {
+            case AlignmentPhase::ROUGH_POSITION:
+                return executeRoughPositionPhase();
+            case AlignmentPhase::YAW_ALIGNMENT:
+                return executeYawAlignmentPhase(package_bbox);
+            case AlignmentPhase::FINE_POSITION:
+                return executeFinePositionPhase();
+            default:
+                return "";
+        }
+    }
+
+    std::string executeRoughPositionPhase() {
+        // Fase 1: Alinhamento grosso em X e Y (sem considerar offset)
+        Eigen::Vector2d current_pos_2d = this->pos.head<2>();
+        Eigen::Vector2d rough_target = this->approx_target.head<2>();
+        Eigen::Vector2d rough_error = rough_target - current_pos_2d;
+
+        float rough_tolerance = 0.3f; // Tolerância maior para alinhamento grosso
+        
+        if (rough_error.norm() < rough_tolerance) {
+            this->current_phase = AlignmentPhase::YAW_ALIGNMENT;
+            this->drone->log("Phase transition: ROUGH_POSITION -> YAW_ALIGNMENT");
+            return "";
+        }
+
+        // Usar movimento local por waypoint para alinhamento grosso
+        Eigen::Vector3d target_pos(rough_target.x(), rough_target.y(), this->pos.z());
+        move_local_by_waypoint(this->drone, target_pos, 0.5f);
+
+        if (this->print_counter % 5 == 0) {
+            this->drone->log("ROUGH_POSITION: error=" + std::to_string(rough_error.norm()) + 
+                           ", target=[" + std::to_string(rough_target.x()) + 
+                           ", " + std::to_string(rough_target.y()) + "]" +
+                           ", current=[" + std::to_string(current_pos_2d.x()) + 
+                           ", " + std::to_string(current_pos_2d.y()) + "]" +
+                           ", error_vec=[" + std::to_string(rough_error.x()) + 
+                           ", " + std::to_string(rough_error.y()) + "]");
+        }
+        
+        return "";
+    }
+
+    std::string executeYawAlignmentPhase(const BoundingBox& package_bbox) {
+        // Fase 2: Alinhamento do yaw (rotação)
+        float current_yaw = this->orientation[2];
+        float desired_yaw = calculateDesiredYaw(package_bbox);
+        float yaw_error = normalizeYawError(desired_yaw - current_yaw);
+
+        if (std::abs(yaw_error) < this->yaw_align_tolerance) {
+            this->current_phase = AlignmentPhase::FINE_POSITION;
+            this->drone->log("Phase transition: YAW_ALIGNMENT -> FINE_POSITION");
+            return "";
+        }
+
+        // Usar rotação específica para yaw
+        rotateYaw(this->drone, desired_yaw);
+
+        if (this->print_counter % 5 == 0) {
+            this->drone->log("YAW_ALIGNMENT: error=" + std::to_string(yaw_error * 180.0 / M_PI) + 
+                           " deg, target=" + std::to_string(desired_yaw * 180.0 / M_PI) + " deg");
+        }
+
+        return "";
+    }
+
+    std::string executeFinePositionPhase() {
+        // Fase 3: Alinhamento fino considerando offset da garra
+        Eigen::Vector2d target_with_offset = calculateTargetWithOffset(this->approx_target);
+        Eigen::Vector2d current_pos_2d = this->pos.head<2>();
+        Eigen::Vector2d fine_error = target_with_offset - current_pos_2d;
+
+        this->horizontal_distance = fine_error.norm();
+
+        if (isAligned(fine_error)) {
+            this->aligned_counter++;
+            if (this->aligned_counter > 10) {
+                return "ALIGNED";
+            }
+        } else {
+            this->aligned_counter = 0;
+        }
+
+        // Usar movimento local por waypoint para alinhamento fino
+        Eigen::Vector3d fine_target_pos(target_with_offset.x(), target_with_offset.y(), this->pos.z());
+        move_local_by_waypoint(this->drone, fine_target_pos, 0.2f); // Velocidade menor para precisão
+
+        if (this->print_counter % 5 == 0) {
+            this->drone->log("FINE_POSITION: error=" + std::to_string(fine_error.norm()) + 
+                           ", target_with_offset=[" + std::to_string(target_with_offset.x()) + 
+                           ", " + std::to_string(target_with_offset.y()) + "]" +
+                           ", current=[" + std::to_string(current_pos_2d.x()) + 
+                           ", " + std::to_string(current_pos_2d.y()) + "]" +
+                           ", error_vec=[" + std::to_string(fine_error.x()) + 
+                           ", " + std::to_string(fine_error.y()) + "]");
+        }
+
+        return "";
+    }
+
+    std::string getPhaseString(AlignmentPhase phase) const {
+        switch (phase) {
+            case AlignmentPhase::ROUGH_POSITION: return "ROUGH_POSITION";
+            case AlignmentPhase::YAW_ALIGNMENT: return "YAW_ALIGNMENT";
+            case AlignmentPhase::FINE_POSITION: return "FINE_POSITION";
+            default: return "UNKNOWN";
+        }
+    }
+
+    /**
+     * Normaliza erro de yaw para [-π, π].
+     */
+    float normalizeYawError(float yaw_error) {
+        while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
+        while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
+        return yaw_error;
+    }
+
+    /**
+     * Método simples para calcular posição do target baseado na proporção da imagem.
+     * Assume que o centro da imagem corresponde à posição atual do drone.
+     */
+    Eigen::Vector3d calculateSimpleTargetPosition(const BoundingBox& package_bbox) {
+        // Calcular deslocamento baseado na diferença do centro da imagem
+        float center_x_norm = package_bbox.center_x; // [0, 1]
+        float center_y_norm = package_bbox.center_y; // [0, 1]
+        
+        // Converter para offset em metros baseado na altura do drone
+        float drone_height = std::abs(this->pos.z()); // Altura positiva
+        float fov_scale = drone_height * 0.2f; // Campo de visão mais conservador
+        
+        // Calcular offset em relação ao centro da imagem (0.5, 0.5)
+        float offset_x = (center_x_norm - 0.5f) * fov_scale * 2.0f; // Escala para metros
+        float offset_y = (center_y_norm - 0.5f) * fov_scale * 2.0f;
+        
+        // Limitar offsets para evitar valores extremos
+        offset_x = std::clamp(offset_x, -2.0f, 2.0f);
+        offset_y = std::clamp(offset_y, -2.0f, 2.0f);
+        
+        // Teste de mapeamento corrigido:
+        // - X da imagem corresponde diretamente a X do mundo (frente)
+        // - Y da imagem corresponde diretamente a Y do mundo (direita)
+        float world_x = this->pos.x() + offset_x;  // X da imagem -> X do mundo
+        float world_y = this->pos.y() + offset_y;  // Y da imagem -> Y do mundo
+        float world_z = 0.0f; // Package no chão
+        
+        // Debug do cálculo
+        if (this->print_counter % 10 == 0) {
+            this->drone->log("SIMPLE_CALC: bbox_center=[" + std::to_string(center_x_norm) + 
+                           ", " + std::to_string(center_y_norm) + "], offset=[" +
+                           std::to_string(offset_x) + ", " + std::to_string(offset_y) + 
+                           "], height=" + std::to_string(drone_height) + 
+                           ", scale=" + std::to_string(fov_scale));
+        }
+        
+        return Eigen::Vector3d(world_x, world_y, world_z);
+    }
 
     /**
      * Calcula o yaw desejado para alinhamento com package retangular.
@@ -181,14 +329,5 @@ private:
         while (desired_yaw < -M_PI) desired_yaw += 2.0 * M_PI;
         
         return desired_yaw;
-    }
-    
-    /**
-     * Normaliza erro de yaw para [-π, π].
-     */
-    float normalizeYawError(float yaw_error) {
-        while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
-        while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
-        return yaw_error;
     }
 };

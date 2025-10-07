@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Eigen/Eigen>
 #include "fsm/fsm.hpp"
 #include "drone/Drone.hpp"

@@ -1,8 +1,16 @@
 #pragma once
 
 #include <Eigen/Eigen>
+#include <cmath>
 #include "drone/Drone.hpp"
 #include "transformations.hpp"
+
+// Utility function to normalize yaw error to [-π, π]
+float normalizeYawError(float yaw_error) {
+    while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
+    while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
+    return yaw_error;
+}
 
 // mudar essa implementacao que move o drone usando velocidade
 // usar posicao alvo e little goal
@@ -40,4 +48,19 @@ bool move_local_by_waypoint(std::shared_ptr<Drone> drone, Eigen::Vector3d waypoi
     );
 
     return false;
+}
+
+void rotateYaw(std::shared_ptr<Drone> drone, float target_yaw, float yaw_rate = 0.3f, float tolerance = 0.05f) {
+    if (drone == nullptr) return;
+
+    float current_yaw = drone->getOrientation()[2];
+    float yaw_diff = normalizeYawError(target_yaw - current_yaw);
+
+    if (std::abs(yaw_diff) < tolerance) {
+        drone->setLocalVelocity(0.0f, 0.0f, 0.0f, 0.0f); // Stop rotation
+        return;
+    }
+
+    float applied_yaw_rate = (yaw_diff > 0 ? yaw_rate : -yaw_rate);
+    drone->setLocalVelocity(0.0f, 0.0f, 0.0f, applied_yaw_rate);
 }

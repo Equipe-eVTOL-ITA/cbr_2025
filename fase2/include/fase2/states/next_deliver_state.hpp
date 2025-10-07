@@ -17,7 +17,7 @@ public:
 
         if(this->vision->isThereDetection()) {
             this->drone->log("Deliver base detected! Aligning...");
-            return "ALIGN TO DELIVER BASE";
+            return "ALIGN TO DELIVER";
         }
 
         return "SPIRAL SEARCH";

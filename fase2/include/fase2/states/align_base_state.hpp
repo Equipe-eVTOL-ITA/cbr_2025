@@ -61,12 +61,11 @@ public:
      * Usa detecções de base do VisionNode e aplica offset específico.
      */
     std::string act(fsm::Blackboard &bb) override {
-        (void) bb;
-        this->print_counter++;
-
-        // Atualizar posição e orientação do drone
-        this->pos = this->drone->getLocalPosition();
-        this->orientation = this->drone->getOrientation();
+        // Chama a implementação padrão da classe base
+        AlignState::act(bb);
+        
+        // Implementação específica para bases
+        // (posição e orientação já atualizadas pela classe base)
         float yaw = this->orientation[2];
         
         // Debug info periódico
@@ -105,7 +104,7 @@ public:
             if (isAligned(alignment_error)) {
                 this->aligned_counter++;
                 if (this->aligned_counter > 10) {
-                    return "PRECISELY ALIGNED";
+                    return "ALIGNED";
                 }
             } else {
                 this->aligned_counter = 0;

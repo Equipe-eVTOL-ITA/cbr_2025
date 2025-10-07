@@ -6,8 +6,8 @@ fase2_fsm:
     fictual_home_z: -0.6 # Remember z points Down
     
     # Coordenadas das bases (A, B, C)
-    base_A_x: 0.0
-    base_A_y: -5.5
+    base_A_x: 3.0
+    base_A_y: -1.0
     base_B_x: 5.0
     base_B_y: -1.0
     base_C_x: 7.0
@@ -22,7 +22,7 @@ fase2_fsm:
     deliver_C_y: -7.0
 
     # === Alturas e Velocidades ===
-    takeoff_height: -3.0
+    takeoff_height: -2.5
     align_package_height: -2.0
     package_height: -1.5
     delivery_height: 0.0
@@ -58,15 +58,15 @@ fase2_fsm:
     pid_yaw_kd: 0.1
 
     # === Offsets de Alinhamento ===
-    base_align_offset_x: 0.05     # Offset da câmera para bases
-    base_align_offset_y: 0.02
-    package_align_offset_x: 0.15  # Offset da garra para packages
+    base_align_offset_x: 0.0     # Offset da câmera para bases
+    base_align_offset_y: 0.0
+    package_align_offset_x: 0.0  # Offset da garra para packages
     package_align_offset_y: 0.0
 
     # === Parâmetros de Visão ===
     height_to_ground: 1.2
     mean_base_height: 0.0
-    mean_package_height: 0.1
+    mean_package_height: 0.0  # Packages no chão
     known_base_radius: 1.5
 
     # === Busca em Espiral ===
@@ -88,3 +88,37 @@ fase2_fsm:
 fase2_vision:
   ros__parameters:
     timeout: 10.0
+    
+    # === Parâmetros de Calibração da Câmera ===
+    # Camera intrinsics for 800x800 published image
+    # 1231.962
+    fx: 600.0  # Focal length X (mais conservador)
+    fy: 600.0  # Focal length Y (mais conservador)
+    cx: 400.0     # Principal point X (center)
+    cy: 400.0     # Principal point Y (center)
+    
+    # Image dimensions
+    image_width: 800
+    image_height: 800
+    
+    # Distortion coefficients (set to zero if using undistorted stream)
+    dist_k1: 0.0
+    dist_k2: 0.0
+    dist_p1: 0.0
+    dist_p2: 0.0
+    dist_k3: 0.0
+    
+    # === Extrinsics: Camera pose in BODY (FRD) frame ===
+    # For downward-facing camera: try different orientation
+    camera_roll: 0.0      # No roll rotation
+    camera_pitch: 0.0     # Try no pitch first to debug
+    camera_yaw: 0.0       # No yaw rotation
+    camera_tx: 0.0        # No translation in X (forward)
+    camera_ty: 0.0        # No translation in Y (right)  
+    camera_tz: 0.0        # No translation in Z (down)
+    
+    # Real world object sizes
+    bbox_real_size: 1.0   # Base size in meters
+    
+    # Coordinate system
+    bbox_is_normalized: true  # Detections come normalized [0,1]
