@@ -9,6 +9,7 @@
 #include "drone/Drone.hpp"
 #include "fase2/aux/vision_fase2.hpp"
 #include "fase2/aux/PidController.hpp"
+#include "fase2/aux/movement.hpp"
 
 /**
  * Classe base abstrata para estados de alinhamento vertical com objetos detectados.
@@ -130,7 +131,48 @@ protected:
     bool isAligned(const Eigen::Vector2d& error) {
         return error.norm() < this->align_tolerance;
     }
-    
+
+    bool executeAlignmentPosition(float tolerance_error, float tolerance_movement){
+        this->drone->log("Executing position alignment...");
+
+        Eigen::Vector2d current_pos_2d = this->pos.head<2>();
+        Eigen::Vector2d target = this->approx_target.head<2>();
+        Eigen::Vector2d error = target - current_pos_2d;
+
+        if(error.norm() < tolerance_error)
+            return true;
+
+        // Usar movimento local por waypoint para alinhamento grosso
+        Eigen::Vector3d target_pos(target.x(), target.y(), this->pos.z());
+        move_local_by_waypoint(this->drone, target_pos, tolerance_movement);
+
+        return false;
+    }
+
+    bool executeAlignmentYaw(float desired_yaw, float tolerance){
+        this->drone->log("Executing yaw alignment...");
+
+        float current_yaw = this->orientation[2];
+        float yaw_error = normalizeYawError(desired_yaw - current_yaw);
+
+        if (std::abs(yaw_error) < tolerance) {
+            this->drone->setLocalVelocity(0.0f, 0.0f, 0.0f, 0.0f); // Stop rotation
+            return true;
+        }
+
+        // Usar rotação específica para yaw
+        rotateYaw(this->drone, desired_yaw);
+
+        return false;
+    }
+
+    // normaliza erro de yaw para [-π, π]
+    float normalizeYawError(float yaw_error) {
+        while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
+        while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
+        return yaw_error;
+    }
+
     void updateDebugInfo() {
         if (this->print_counter % 5 == 0) {
             this->drone->log("Position: [" + std::to_string(this->pos.x()) + ", " + 

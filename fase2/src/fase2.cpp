@@ -133,11 +133,13 @@ public:
 
         this->add_transitions("NEXT DELIVER", {
             {"ALIGN TO DELIVER", "ALIGN TO BASE"},
+            {"SPIRAL SEARCH", "SPIRAL SEARCH"},
             {"NOT FOUND", "ERROR"},
             {"SEG FAULT", "ERROR"}
         });
 
         this->add_transitions("SPIRAL SEARCH", {
+            {"ALIGN TO DELIVER", "ALIGN TO BASE"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -154,7 +156,7 @@ public:
         });
 
         this->add_transitions("PACKAGE", {
-            {"DONE", "TAKEOFF"},
+            {"DONE", "ARMING"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -264,6 +266,7 @@ public:
 
             // === Tolerâncias ===
             {"position_tolerance", 0.07},
+            {"takeoff_tolerance", 0.3},        // Tolerância específica para takeoff (30cm)
             {"align_tolerance", 0.05},         // Usado pelos align states
             {"align_base_tolerance", 0.05},    // Tolerância específica para bases
             {"align_package_tolerance", 0.02}, // Tolerância específica para packages

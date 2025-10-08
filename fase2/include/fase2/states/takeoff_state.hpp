@@ -31,7 +31,9 @@ public:
         this->drone->log("STATE: TAKEOFF");
 
         this->max_velocity = *bb.get<float>("max_vertical_velocity");
-        this->position_tolerance = *bb.get<float>("position_tolerance");
+        
+        auto takeoff_tolerance_ptr = bb.get<float>("takeoff_tolerance");
+        this->position_tolerance = takeoff_tolerance_ptr ? *takeoff_tolerance_ptr : 0.3f; // Default: 30cm
 
         float takeoff_height = *bb.get<float>("takeoff_height");
 
@@ -55,12 +57,6 @@ public:
         this->goal = Eigen::Vector3d({this->pos[0], this->pos[1], takeoff_height});
         
         Eigen::Vector3d diff = this->goal - this->pos;
-        
-        this->drone->log("TAKEOFF: pos=[" + std::to_string(this->pos[0]) + "," + 
-                        std::to_string(this->pos[1]) + "," + std::to_string(this->pos[2]) + 
-                        "], goal=[" + std::to_string(this->goal[0]) + "," + 
-                        std::to_string(this->goal[1]) + "," + std::to_string(this->goal[2]) + 
-                        "], diff_norm=" + std::to_string(diff.norm()));
 
         if(diff.norm() < this->position_tolerance) {
             if(!this->take_off_taken) {
@@ -69,12 +65,10 @@ public:
             }
  
             // inverte o valor da booleana
-            bb.set<bool>("deliver_after_takeoff", !this->deliver_after_takeoff);
+            this->deliver_after_takeoff = !this->deliver_after_takeoff;
+            bb.set<bool>("deliver_after_takeoff", this->deliver_after_takeoff);
             
-            if(this->deliver_after_takeoff)
-                return "DELIVER PACKAGE";
-
-            return "NEXT BASE";
+            return this->deliver_after_takeoff ? "DELIVER PACKAGE" : "NEXT BASE";
         }
 
         move_local_by_waypoint(this->drone, this->goal, this->max_velocity);

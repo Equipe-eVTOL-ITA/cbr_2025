@@ -10,10 +10,16 @@ class NextBaseState : public NextWaypoints {
 public:
     NextBaseState() : NextWaypoints() {}
 
+    void on_enter(fsm::Blackboard &bb) override {
+        NextWaypoints::on_enter(bb);
+        this->drone->log("STATE: NEXT BASE");
+    }
+
     std::string act(fsm::Blackboard &bb) override {
         (void) bb;
 
         std::string std_next_waypoint = NextWaypoints::act(bb);
+
         if(std_next_waypoint != "ARRIVED")
             return std_next_waypoint;
 
@@ -21,7 +27,7 @@ public:
 
         this->drone->log("Searching for base by moving left...");
 
-        if(this->vision->isThereBaseDetection()) {
+        if(this->vision->isTherePackageDetection()) { // no base tem que alinhar com o pacote a ser pego
             this->drone->log("Base detected! Aligning...");
             return "ALIGN TO PACKAGE";
         }
@@ -40,5 +46,9 @@ private:
         //move_local_by_speed(this->drone, 1.0f, 0.0f, 0.0f);
 
         return true;
+    }
+
+    void setTargetPoint() override {
+        this->target_point = this->current_pair.base;
     }
 };
