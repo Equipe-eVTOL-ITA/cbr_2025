@@ -149,6 +149,10 @@ protected:
         return false;
     }
 
+    bool executeAlignmentPosition(float tolerance){
+        return this->executeAlignmentPosition(tolerance, tolerance);
+    }
+
     bool executeAlignmentYaw(float desired_yaw, float tolerance){
         this->drone->log("Executing yaw alignment...");
 

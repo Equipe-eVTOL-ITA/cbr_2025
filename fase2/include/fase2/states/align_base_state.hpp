@@ -18,8 +18,15 @@ private:
     float height_to_ground;
     float mean_base_height;
     std::string package_state;
+    bool aligned;
 
 public:
+
+    void on_enter(fsm::Blackboard &bb) override {
+        AlignState::on_enter(bb);
+        this->aligned = false;
+    }
+
     std::string act(fsm::Blackboard &bb) override {
 
         AlignState::act(bb); // já atualiza pos e orientacao
@@ -47,30 +54,22 @@ public:
                 this->pos, this->orientation, this->mean_base_height, true
             );
 
-            // Calcular target com offset para alinhamento correto
-            Eigen::Vector2d target_with_offset = calculateTargetWithOffset(this->approx_target);
-            Eigen::Vector2d current_pos_2d = this->pos.head<2>();
-            Eigen::Vector2d error = target_with_offset - current_pos_2d;
-            this->horizontal_distance = error.norm();
-
             // Debug detalhado da detecção da base
             if (this->print_counter % 5 == 0) {
                 this->drone->log("Base Detection - target pos: [" + 
                                std::to_string(this->approx_target.x()) + ", " + 
                                std::to_string(this->approx_target.y()) + ", " + 
                                std::to_string(this->approx_target.z()) + "]");
-                this->drone->log("Target with offset: [" + 
-                               std::to_string(target_with_offset.x()) + ", " + 
-                               std::to_string(target_with_offset.y()) + "]");
                 this->drone->log("Drone pos: [" + std::to_string(this->pos.x()) + 
                                ", " + std::to_string(this->pos.y()) + ", " + 
                                std::to_string(this->pos.z()) + "], orientation: " +
                                std::to_string(this->orientation[2] * 180.0 / M_PI) + "°");
-                this->drone->log("Horizontal error: " + std::to_string(this->horizontal_distance) + "m");
             }
 
+            this->aligned = executeAlignmentPosition(this->align_tolerance);
+
             // Verificar se está alinhado
-            if (this->horizontal_distance < this->align_tolerance) {
+            if (this->aligned == false) {
                 this->aligned_counter++;
                 if (this->aligned_counter > 10) {
                     this->drone->log("Base alignment achieved - READY TO LAND");
@@ -78,16 +77,6 @@ public:
                 }
             } else {
                 this->aligned_counter = 0;
-                
-                // Usar executeAlignmentPosition da classe base com waypoints
-                // Criar target 3D com a altura atual do drone
-                Eigen::Vector3d target_3d(target_with_offset.x(), target_with_offset.y(), this->pos.z());
-                
-                executeAlignmentPosition(target_3d);
-                
-                if (this->print_counter % 10 == 0) {
-                    this->drone->log("Moving toward base via waypoint - error: " + std::to_string(this->horizontal_distance) + "m");
-                }
             }
 
             // Publicar detecção da base para telemetria
