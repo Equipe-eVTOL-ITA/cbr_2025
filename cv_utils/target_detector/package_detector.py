@@ -13,9 +13,10 @@ Inherits from TargetDetector and implements the abstract methods:
 
 import cv2
 import numpy as np
+import math
 from typing import List, Dict, Tuple
 
-from .target_detector import TargetDetector, run_detector
+from target_detector import TargetDetector, run_detector
 
 
 class PackageDetector(TargetDetector):
@@ -28,6 +29,12 @@ class PackageDetector(TargetDetector):
         self._initialize_color_ranges()
         
         self.get_logger().info("Package detector initialized successfully")
+    
+    def _declare_ros_parameters(self):
+        """Override to set package_detector specific default topics"""
+        # Image subscription and detection publishing
+        self.declare_parameter('image_topic', '/vertical_camera/image_raw')
+        self.declare_parameter('detection_topic', '/package_detector/detections')  # Package detector specific topic
     
     def _setup_color_parameters(self):
         """Setup HSV color parameters for gray detection"""
@@ -118,7 +125,7 @@ class PackageDetector(TargetDetector):
         return debug_images
     
     def _find_package_regions(self, gray_mask: np.ndarray) -> List[Dict]:
-        """Find gray package regions with orientation analysis"""
+        """Find gray package regions with orientation analysis using image moments"""
         detections = []
         
         # Get image dimensions for normalization
@@ -143,12 +150,38 @@ class PackageDetector(TargetDetector):
             if len(contour) < self.package_min_contour_points:
                 continue
             
-            # Get axis-aligned bounding rect
+            # Get axis-aligned bounding rect for basic measurements
             x, y, w, h = cv2.boundingRect(contour)
             
-            # Use minAreaRect to get oriented bounding box
+            # ============= IMPLEMENTAÇÃO COM MOMENTOS DE IMAGEM =============
+            # Calcular momentos de imagem (mesma técnica do seguidor de linha)
+            M = cv2.moments(contour)
+            A = M['m00']  # Área do contorno
+            
+            if A <= 0:
+                continue
+                
+            # Centroide em pixels usando momentos (mais preciso)
+            cx_pixels = M['m10'] / A
+            cy_pixels = M['m01'] / A
+            
+            # Calcular orientação usando momentos centrais (DIREÇÃO PRINCIPAL)
+            mu20 = M['mu20'] / A  # Momento central normalizado
+            mu02 = M['mu02'] / A  # Momento central normalizado  
+            mu11 = M['mu11'] / A  # Momento central normalizado
+            
+            # Calcular ângulo da direção principal (menor momento de inércia)
+            # Esta é a MESMA fórmula do seguidor de linha!
+            theta_rad = 0.5 * math.atan2(2 * mu11, mu20 - mu02)
+            
+            # Garantir que theta esteja entre -pi/2 e pi/2
+            theta_rad = math.asin(math.sin(theta_rad))
+            
+            # ============= FIM DA IMPLEMENTAÇÃO COM MOMENTOS =============
+            
+            # Para compatibilidade, ainda calcular minAreaRect para largura/altura
             rect = cv2.minAreaRect(contour)
-            (cx, cy), (rect_w, rect_h), angle_deg = rect
+            (_, _), (rect_w, rect_h), _ = rect  # Ignorar o ângulo do minAreaRect
             
             # Ignore degenerate sizes
             if rect_w <= 0 or rect_h <= 0:
@@ -171,10 +204,10 @@ class PackageDetector(TargetDetector):
             confidence = self._calculate_confidence(solidity, extent, aspect_ratio)
             
             detection = {
-                'bbox': (x, y, w, h),                         # axis-aligned for quick drawing/roi
-                'center': (float(cx), float(cy)),             # rotated center in pixels
-                'size': (float(rect_w), float(rect_h)),       # rotated width/height in pixels
-                'angle': float(np.deg2rad(angle_deg)),        # angle in radians
+                'bbox': (x, y, w, h),                           # axis-aligned for quick drawing/roi
+                'center': (float(cx_pixels), float(cy_pixels)), # centroide preciso dos momentos
+                'size': (float(rect_w), float(rect_h)),         # dimensões do minAreaRect
+                'angle': float(theta_rad),                      # ÂNGULO CORRETO dos momentos!
                 'area': area,
                 'aspect_ratio': aspect_ratio,
                 'solidity': solidity,
@@ -239,16 +272,21 @@ class PackageDetector(TargetDetector):
             if 'angle' in detection and 'size' in detection and 'center' in detection:
                 cx, cy = detection['center']
                 sz_w, sz_h = detection['size']
-                angle_deg = np.rad2deg(detection['angle'])
+                angle_deg = math.degrees(detection['angle'])  # Converter para graus para minAreaRect
                 rect = ((cx, cy), (sz_w, sz_h), angle_deg)
                 box_pts = cv2.boxPoints(rect).astype(int)
                 cv2.drawContours(image, [box_pts], 0, color, 2)
                 
-                # Draw orientation arrow
-                arrow_length = min(sz_w, sz_h) * 0.3
-                arrow_end_x = cx + arrow_length * np.cos(detection['angle'])
-                arrow_end_y = cy + arrow_length * np.sin(detection['angle'])
-                cv2.arrowedLine(image, (int(cx), int(cy)), (int(arrow_end_x), int(arrow_end_y)), color, 2)
+                # Draw orientation arrow (DIREÇÃO PRINCIPAL DOS MOMENTOS)
+                arrow_length = min(sz_w, sz_h) * 0.4
+                arrow_end_x = cx + arrow_length * math.cos(detection['angle'])
+                arrow_end_y = cy + arrow_length * math.sin(detection['angle'])
+                cv2.arrowedLine(image, (int(cx), int(cy)), (int(arrow_end_x), int(arrow_end_y)), (255, 0, 0), 3)
+                
+                # Desenhar texto com informação da orientação
+                angle_text = f"Theta: {math.degrees(detection['angle']):.1f}°"
+                cv2.putText(image, angle_text, (int(cx-50), int(cy-30)), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
             else:
                 cv2.rectangle(image, (x, y), (x+w, y+h), color, 2)
 
@@ -265,8 +303,17 @@ class PackageDetector(TargetDetector):
 
 def main(args=None):
     """Main function for package detector"""
-    package_detector = PackageDetector()
-    run_detector(package_detector, args)
+    import rclpy
+    rclpy.init(args=args)
+    
+    try:
+        package_detector = PackageDetector()
+        rclpy.spin(package_detector)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

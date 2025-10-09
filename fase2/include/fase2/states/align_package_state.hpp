@@ -5,6 +5,8 @@
 #include "align_state.hpp"
 #include "fase2/aux/movement.hpp"
 
+// considerando que o drone gira no sentido anti-horário para ângulos positivos
+
 /**
  * Estado de alinhamento específico para packages.
  * 
@@ -34,6 +36,7 @@ protected:
         this->offset = Eigen::Vector2d(package_offset_x, package_offset_y);
         
         this->mean_package_height = *bb.get<float>("mean_package_height");
+        
         this->yaw_align_tolerance = *bb.get<float>("yaw_align_tolerance");
         this->max_yaw_rate = *bb.get<float>("max_yaw_rate");
         
@@ -47,6 +50,7 @@ protected:
         this->movement_speed = *bb.get<float>("rough_movement_speed");
 
         this->fine_tolerance = *bb.get<float>("align_package_tolerance");
+        this->package_base_dist_tolerance = *bb.get<float>("package_base_dist_tolerance");
     }
 
     // tipo de alinhamento para logs
@@ -61,7 +65,6 @@ public:
         
         this->current_phase = AlignmentPhase::ROUGH_POSITION;
         this->aligned_counter = 0;
-        this->horizontal_distance = 0.0f;
         this->yaw_pid.reset();
 
         this->rough_tolerance = 0.3f; // Tolerância maior para alinhamento grosso
@@ -72,7 +75,7 @@ public:
         
         AlignState::act(bb); // ja atualiza pos e orientacao
 
-        // float current_yaw = this->orientation[2];
+        float current_yaw = this->orientation[2];
 
         // timeout
         if (this->vision->lastPackageDetectionTime() > this->detection_timeout) {
@@ -80,11 +83,32 @@ public:
             return "LOST PACKAGE";
         }
 
-        if (this->vision->isTherePackageDetection()) {
+        // o pacote sempre estará sobre uma base
+        if (this->vision->isTherePackageDetection() && this->vision->isThereBaseDetection()) {
             this->total_detected++;
             this->no_detection_counter = 0;
 
             auto package_bbox = this->vision->getClosestPackageBbox();
+            auto base_bbox = this->vision->getClosestBaseBbox();
+
+            float distance = distance_between_bboxes(package_bbox, base_bbox);
+            if(distance > package_base_dist_tolerance){
+                this->package_far_from_base_counter++;
+
+                if(this->package_far_from_base_counter > 5){
+                    this->drone->log("Package far from base. Distance: " + std::to_string(distance));
+                    
+                    // subindo um pouco para tentar achar a base
+                    Eigen::Vector3d new_pos = this->pos;
+                    new_pos.z() += 0.2f; // sobe 20 cm
+                    move_local_by_waypoint(this->drone, new_pos, 0.1f);
+                    
+                    return "";
+                }
+                return "";
+            } else {
+                this->package_far_from_base_counter = 0;
+            }
             
             // calcula a posição baseado apenas na proporção da tela
             this->approx_target = calculateSimpleTargetPosition(package_bbox);
@@ -118,6 +142,9 @@ private:
     float movement_speed = 0.5f;  // Velocidade para movimento grosso
 
     float fine_tolerance;
+    float package_base_dist_tolerance;
+
+    int package_far_from_base_counter = 0;
 
     // estados do alinhamento sequencial
     enum class AlignmentPhase {
@@ -155,7 +182,16 @@ private:
 
     std::string executeYawAlignmentPhase(const BoundingBox& package_bbox) {
         // Fase 2: Alinhamento do yaw (rotação)
+        
         float desired_yaw = calculateDesiredYaw(package_bbox);
+        float current_yaw = this->orientation[2];
+        
+        // Calcular erro angular
+        float yaw_error = desired_yaw - current_yaw;
+        
+        // Normalizar erro para [-π, π]
+        while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
+        while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
         
         if (executeAlignmentYaw(desired_yaw, this->yaw_align_tolerance)) {
             this->current_phase = AlignmentPhase::FINE_POSITION;
@@ -171,8 +207,6 @@ private:
         Eigen::Vector2d target_with_offset = calculateTargetWithOffset(this->approx_target);
         Eigen::Vector2d current_pos_2d = this->pos.head<2>();
         Eigen::Vector2d fine_error = target_with_offset - current_pos_2d;
-
-        this->horizontal_distance = fine_error.norm();
 
         if (fine_error.norm() < this->align_tolerance) {
             this->aligned_counter++;
@@ -199,100 +233,62 @@ private:
         }
     }
 
-    // posicao do target baseado na proporção da imagem
-    Eigen::Vector3d calculateSimpleTargetPosition(const BoundingBox& package_bbox) {
-
-        // validando a entrada
-        if (!std::isfinite(package_bbox.center_x) || !std::isfinite(package_bbox.center_y) ||
-            package_bbox.center_x < 0.0f || package_bbox.center_x > 1.0f ||
-            package_bbox.center_y < 0.0f || package_bbox.center_y > 1.0f) {
-            this->drone->log("ERROR: Invalid bbox coordinates detected!");
-            return this->pos; // posição atual como fallback
-        }
-        
-        float center_x_norm = package_bbox.center_x; // [0, 1]
-        float center_y_norm = package_bbox.center_y; // [0, 1]
-        
-        // Converter para offset em metros baseado na altura do drone
-        float drone_height = std::abs(this->pos.z()); // Altura positiva
-        if (drone_height < 0.1f) drone_height = 2.5f; // Fallback para altura padrão
-        float fov_scale = drone_height * 0.3f; // Ajustar escala se necessário
-        
-        // Calcular offset em relação ao centro da imagem (0.5, 0.5)
-        // COORDENADAS DA IMAGEM: X=direita, Y=baixo
-        float image_offset_x = (center_x_norm - 0.5f) * fov_scale * 2.0f; // Direita = positivo
-        float image_offset_y = (center_y_norm - 0.5f) * fov_scale * 2.0f; // Baixo = positivo
-        
-        // Limitar offsets para evitar valores extremos
-        image_offset_x = std::clamp(image_offset_x, -2.0f, 2.0f);
-        image_offset_y = std::clamp(image_offset_y, -2.0f, 2.0f);
-        
-        // Aplicar rotação baseada no yaw atual do drone
-        float current_yaw = this->orientation[2];
-        
-        // Mapeamento de coordenadas
-        // Para câmera apontando para baixo:
-        // - Y da imagem (baixo) → X do drone (frente): INVERTER (para convergir)
-        // - X da imagem (direita) → Y do drone (direita): MANTER (para convergir)
-        float drone_frame_x = -image_offset_y;  // Baixo na imagem = movimento PARA FRENTE
-        float drone_frame_y = image_offset_x;   // Direita na imagem = movimento PARA DIREITA
-        
-        // Aplicar rotação do yaw para converter para coordenadas globais
-        float cos_yaw = std::cos(current_yaw);
-        float sin_yaw = std::sin(current_yaw);
-
-        // Verificar se os valores trigonométricos são válidos
-        if (!std::isfinite(cos_yaw) || !std::isfinite(sin_yaw)) {
-            this->drone->log("ERROR: Invalid trigonometric values!");
-            return this->pos; // Retornar posição atual como fallback
-        }
-        
-        float world_offset_x = drone_frame_x * cos_yaw - drone_frame_y * sin_yaw;
-        float world_offset_y = drone_frame_x * sin_yaw + drone_frame_y * cos_yaw;
-
-        // Limitar offsets finais para evitar valores extremos
-        world_offset_x = std::clamp(world_offset_x, -5.0f, 5.0f);
-        world_offset_y = std::clamp(world_offset_y, -5.0f, 5.0f);
-        
-        // Posição final no mundo
-        float world_x = this->pos.x() + world_offset_x;
-        float world_y = this->pos.y() + world_offset_y;
-        float world_z = 0.0f; // Package no chão
-
-        // Verificar se o resultado é válido
-        if (!std::isfinite(world_x) || !std::isfinite(world_y)) {
-            this->drone->log("ERROR: Invalid world coordinates calculated!");
-            return this->pos; // posição atual como fallback
-        }
-        
-        /*/ Debug do cálculo
-        if (this->print_counter % 10 == 0) {
-            this->drone->log("TARGET_CALC: bbox=[" + std::to_string(center_x_norm) + 
-                           "," + std::to_string(center_y_norm) + "], img_offset=[" +
-                           std::to_string(image_offset_x) + "," + std::to_string(image_offset_y) + 
-                           "], drone_frame=[" + std::to_string(drone_frame_x) + "," + 
-                           std::to_string(drone_frame_y) + "], yaw=" + 
-                           std::to_string(current_yaw * 180.0 / M_PI) + "°");
-            this->drone->log("WORLD_TARGET: [" + std::to_string(world_x) + "," + 
-                           std::to_string(world_y) + "] from drone_pos=[" + 
-                           std::to_string(this->pos.x()) + "," + std::to_string(this->pos.y()) + "]");
-        }*/
-        
-        return Eigen::Vector3d(world_x, world_y, world_z);
-    }
-
-
     float calculateDesiredYaw(const BoundingBox& package_bbox) {
-        // A rotação do bbox está em radianos (CCW em coordenadas de imagem)
-        float bbox_rotation = package_bbox.rotation;
+        float package_direction = package_bbox.rotation;
         
-        // Converter rotação da bbox para orientação desejada do drone
-        // Adicionando 90 graus (π/2) em relação ao alinhamento original
-        float desired_yaw = this->initial_yaw + bbox_rotation + M_PI/2.0;
+        // NORMALIZAR o ângulo do package primeiro
+        while (package_direction > M_PI) package_direction -= 2.0 * M_PI;
+        while (package_direction < -M_PI) package_direction += 2.0 * M_PI;
         
-        // Normalizar para [-π, π]
-        while (desired_yaw > M_PI) desired_yaw -= 2.0 * M_PI;
-        while (desired_yaw < -M_PI) desired_yaw += 2.0 * M_PI;
+        // Testar diferentes transformações
+        float option1 = this->initial_yaw + package_direction;
+        float option2 = this->initial_yaw - package_direction;  
+        float option3 = this->initial_yaw + package_direction + M_PI/2;
+        float option4 = this->initial_yaw + package_direction - M_PI/2;
+        
+        // Normalizar todas as opções
+        auto normalize_angle = [](float angle) {
+            while (angle > M_PI) angle -= 2.0 * M_PI;
+            while (angle < -M_PI) angle += 2.0 * M_PI;
+            return angle;
+        };
+        
+        option1 = normalize_angle(option1);
+        option2 = normalize_angle(option2);
+        option3 = normalize_angle(option3);
+        option4 = normalize_angle(option4);
+        
+        // Escolher a opção com menor distância angular do yaw atual
+        float current_yaw = this->orientation[2];
+        std::vector<float> options = {option1, option2, option3, option4};
+        std::vector<std::string> option_names = {"+", "-", "+90°", "-90°"};
+        
+        float min_error = std::abs(normalize_angle(option1 - current_yaw));
+        int best_option = 0;
+        float desired_yaw = option1;
+        
+        for (int i = 1; i < 4; i++) {
+            float error = std::abs(normalize_angle(options[i] - current_yaw));
+            if (error < min_error) {
+                min_error = error;
+                best_option = i;
+                desired_yaw = options[i];
+            }
+        }
+        
+        // Log detalhado para debug
+        this->drone->log("=== YAW DEBUG ===");
+        this->drone->log("Package rotation (raw): " + std::to_string(package_bbox.rotation * 180.0 / M_PI) + "°");
+        this->drone->log("Package direction (normalized): " + std::to_string(package_direction * 180.0 / M_PI) + "°");
+        this->drone->log("Initial yaw: " + std::to_string(this->initial_yaw * 180.0 / M_PI) + "°");
+        this->drone->log("Current yaw: " + std::to_string(this->orientation[2] * 180.0 / M_PI) + "°");
+        this->drone->log("Option 1 (+): " + std::to_string(option1 * 180.0 / M_PI) + "°");
+        this->drone->log("Option 2 (-): " + std::to_string(option2 * 180.0 / M_PI) + "°");
+        this->drone->log("Option 3 (+90°): " + std::to_string(option3 * 180.0 / M_PI) + "°");
+        this->drone->log("Option 4 (-90°): " + std::to_string(option4 * 180.0 / M_PI) + "°");
+        this->drone->log("Best option: " + option_names[best_option] + " (error: " + std::to_string(min_error * 180.0 / M_PI) + "°)");
+        this->drone->log("Selected desired_yaw: " + std::to_string(desired_yaw * 180.0 / M_PI) + "°");
+        this->drone->log("================");
         
         return desired_yaw;
     }

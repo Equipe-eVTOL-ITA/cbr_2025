@@ -42,25 +42,23 @@ public:
             this->total_detected++;
             this->no_detection_counter = 0;
 
-            // Obter posição da base usando a mesma lógica do vision
-            this->approx_target = this->vision->getClosestBasePosition(
-                this->pos, this->orientation, this->mean_base_height, true
-            );
+            auto base_bbox = this->vision->getClosestBaseBbox();
+            
+            // Calcula a posição baseado na proporção da tela
+            this->approx_target = calculateSimpleTargetPosition(base_bbox);
 
             this->aligned = executeAlignmentPosition(this->align_tolerance);
 
-            // Verificar se está alinhado
-            if (this->aligned == false) {
+            if (this->aligned == true) {
                 this->aligned_counter++;
                 if (this->aligned_counter > 10) {
                     this->drone->log("Base alignment achieved - READY TO LAND");
                     return "ALIGNED";
                 }
             } else {
-                this->aligned_counter = 0;
+                this->aligned_counter = 0; // reseta o counter
             }
 
-            // Publicar detecção da base para telemetria
             this->vision->publishBaseDetection("detected_base", this->approx_target, this->mean_base_height);
 
         } else {
@@ -70,7 +68,6 @@ public:
             
             if (this->no_detection_counter > 3) {
                 this->drone->log("No base detection found. Maintaining position.");
-                // Manter posição atual usando waypoint
                 this->drone->setLocalPosition(this->pos.x(), this->pos.y(), this->pos.z(), this->orientation[2]);
                 return "";
             }
@@ -78,6 +75,9 @@ public:
 
         return "";
     }
+
+private:
+    protected:
 
 protected:
     void configureOffset(fsm::Blackboard &bb) override {

@@ -31,6 +31,12 @@ struct BoundingBox {
     int64_t timestamp;
 };
 
+float distance_between_bboxes(const BoundingBox& a, const BoundingBox& b){
+    float dx = a.center_x - b.center_x;
+    float dy = a.center_y - b.center_y;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
 class VisionNode : public rclcpp::Node {
 public:
     VisionNode() : Node("fase2_vision") {

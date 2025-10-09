@@ -300,6 +300,7 @@ public:
             {"align_base_tolerance", 0.05},    // Tolerância específica para bases
             {"align_package_tolerance", 0.02}, // Tolerância específica para packages
             {"yaw_align_tolerance", 0.087},    // ~5 graus para alinhamento rotacional
+            {"package_base_dist_tolerance", 0.2}, // Tolerância máxima entre package e base para considerar que estão juntos
 
             // === Timeouts ===
             {"detection_timeout", 10.0},

@@ -66,7 +66,7 @@ public:
         this->pos = this->drone->getLocalPosition();
         this->orientation = this->drone->getOrientation();
         
-        updateDebugInfo();
+        // updateDebugInfo();
         
         return "";
     }
@@ -95,7 +95,6 @@ protected:
     int aligned_counter;
     int total_detected;
     int total_undetected;
-    float horizontal_distance; // é usado no align_package_state
 
     // timeout
     float detection_timeout;
@@ -131,6 +130,78 @@ protected:
     bool isAligned(const Eigen::Vector2d& error) {
         return error.norm() < this->align_tolerance;
     }
+
+public:
+    // posicao do target baseado na proporção da imagem
+    Eigen::Vector3d calculateSimpleTargetPosition(const BoundingBox& bbox) {
+
+        // validando a entrada
+        if (!std::isfinite(bbox.center_x) || !std::isfinite(bbox.center_y) ||
+            bbox.center_x < 0.0f || bbox.center_x > 1.0f ||
+            bbox.center_y < 0.0f || bbox.center_y > 1.0f) {
+            this->drone->log("ERROR: Invalid bbox coordinates detected!");
+            return this->pos; // posição atual como fallback
+        }
+        
+        float center_x_norm = bbox.center_x; // [0, 1]
+        float center_y_norm = bbox.center_y; // [0, 1]
+        
+        // Converter para offset em metros baseado na altura do drone
+        float drone_height = std::abs(this->pos.z()); // Altura positiva
+        if (drone_height < 0.1f) drone_height = 2.5f; // Fallback para altura padrão
+        float fov_scale = drone_height * 0.3f; // Ajustar escala se necessário
+        
+        // Calcular offset em relação ao centro da imagem (0.5, 0.5)
+        // COORDENADAS DA IMAGEM: X=direita, Y=baixo
+        float image_offset_x = (center_x_norm - 0.5f) * fov_scale * 2.0f; // Direita = positivo
+        float image_offset_y = (center_y_norm - 0.5f) * fov_scale * 2.0f; // Baixo = positivo
+        
+        // Limitar offsets para evitar valores extremos
+        image_offset_x = std::clamp(image_offset_x, -2.0f, 2.0f);
+        image_offset_y = std::clamp(image_offset_y, -2.0f, 2.0f);
+        
+        // Aplicar rotação baseada no yaw atual do drone
+        float current_yaw = this->orientation[2];
+        
+        // Mapeamento de coordenadas
+        // Para câmera apontando para baixo:
+        // - Y da imagem (baixo) → X do drone (frente): INVERTER (para convergir)
+        // - X da imagem (direita) → Y do drone (direita): MANTER (para convergir)
+        float drone_frame_x = -image_offset_y;  // Baixo na imagem = movimento PARA FRENTE
+        float drone_frame_y = image_offset_x;   // Direita na imagem = movimento PARA DIREITA
+        
+        // Aplicar rotação do yaw para converter para coordenadas globais
+        float cos_yaw = std::cos(current_yaw);
+        float sin_yaw = std::sin(current_yaw);
+
+        // Verificar se os valores trigonométricos são válidos
+        if (!std::isfinite(cos_yaw) || !std::isfinite(sin_yaw)) {
+            this->drone->log("ERROR: Invalid trigonometric values!");
+            return this->pos; // Retornar posição atual como fallback
+        }
+        
+        float world_offset_x = drone_frame_x * cos_yaw - drone_frame_y * sin_yaw;
+        float world_offset_y = drone_frame_x * sin_yaw + drone_frame_y * cos_yaw;
+
+        // Limitar offsets finais para evitar valores extremos
+        world_offset_x = std::clamp(world_offset_x, -5.0f, 5.0f);
+        world_offset_y = std::clamp(world_offset_y, -5.0f, 5.0f);
+        
+        // Posição final no mundo (target no chão)
+        float world_x = this->pos.x() + world_offset_x;
+        float world_y = this->pos.y() + world_offset_y;
+        float world_z = 0.0f; // Target no chão
+
+        // Verificar se o resultado é válido
+        if (!std::isfinite(world_x) || !std::isfinite(world_y)) {
+            this->drone->log("ERROR: Invalid world coordinates calculated!");
+            return this->pos; // posição atual como fallback
+        }
+        
+        return Eigen::Vector3d(world_x, world_y, world_z);
+    }
+
+protected:
 
     bool executeAlignmentPosition(float tolerance_error, float tolerance_movement){
         //this->drone->log("Executing position alignment...");
@@ -183,7 +254,6 @@ protected:
                            std::to_string(this->pos.y()) + ", " + std::to_string(this->pos.z()) + "]");
             this->drone->log("Detected: " + std::to_string(this->total_detected) + 
                            ", Undetected: " + std::to_string(this->total_undetected));
-            this->drone->log("Alignment error: " + std::to_string(this->horizontal_distance) + "m");
         }
     }
 
@@ -207,7 +277,6 @@ private:
         this->print_counter = 0;
         this->no_detection_counter = 0;
         this->aligned_counter = 0;
-        this->horizontal_distance = 0;
         this->total_detected = 0;
         this->total_undetected = 0;
     }
