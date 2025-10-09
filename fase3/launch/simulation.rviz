@@ -1,0 +1,425 @@
+Panels:
+  - Class: rviz_common/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Status1
+        - /Image1
+        - /Image2
+      Splitter Ratio: 0.5
+    Tree Height: 439
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Expanded:
+      - /2D Goal Pose1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.5886790156364441
+  - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz_common/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: ""
+  - Class: rviz_common/Displays
+    Help Height: 70
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Grid1
+      Splitter Ratio: 0.5
+    Tree Height: 447
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 25
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 25; 255; 0
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /drone/path
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /drone/pose
+      Value: true
+    - Alpha: 1
+      Angular Arrow Scale: 2
+      Angular Color: 204; 204; 51
+      Arrow Width: 0.5
+      Class: rviz_default_plugins/TwistStamped
+      Enabled: true
+      Hide Small Values: true
+      History Length: 1
+      Linear Arrow Scale: 2
+      Linear Color: 204; 51; 51
+      Name: TwistStamped
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /drone/twist
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /base_detector/mask_debug
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /base_detector/bbox_debug
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        estimate_1: true
+        estimate_10: true
+        estimate_100: true
+        estimate_101: true
+        estimate_102: true
+        estimate_103: true
+        estimate_104: true
+        estimate_105: true
+        estimate_106: true
+        estimate_107: true
+        estimate_108: true
+        estimate_109: true
+        estimate_11: true
+        estimate_110: true
+        estimate_111: true
+        estimate_112: true
+        estimate_113: true
+        estimate_114: true
+        estimate_115: true
+        estimate_116: true
+        estimate_117: true
+        estimate_118: true
+        estimate_119: true
+        estimate_12: true
+        estimate_120: true
+        estimate_121: true
+        estimate_122: true
+        estimate_123: true
+        estimate_124: true
+        estimate_125: true
+        estimate_126: true
+        estimate_127: true
+        estimate_128: true
+        estimate_129: true
+        estimate_13: true
+        estimate_130: true
+        estimate_131: true
+        estimate_132: true
+        estimate_133: true
+        estimate_134: true
+        estimate_135: true
+        estimate_136: true
+        estimate_137: true
+        estimate_138: true
+        estimate_139: true
+        estimate_14: true
+        estimate_140: true
+        estimate_141: true
+        estimate_142: true
+        estimate_143: true
+        estimate_144: true
+        estimate_145: true
+        estimate_146: true
+        estimate_147: true
+        estimate_148: true
+        estimate_149: true
+        estimate_15: true
+        estimate_150: true
+        estimate_151: true
+        estimate_152: true
+        estimate_153: true
+        estimate_154: true
+        estimate_155: true
+        estimate_156: true
+        estimate_157: true
+        estimate_158: true
+        estimate_159: true
+        estimate_16: true
+        estimate_160: true
+        estimate_161: true
+        estimate_162: true
+        estimate_163: true
+        estimate_164: true
+        estimate_165: true
+        estimate_166: true
+        estimate_167: true
+        estimate_168: true
+        estimate_17: true
+        estimate_18: true
+        estimate_19: true
+        estimate_2: true
+        estimate_20: true
+        estimate_21: true
+        estimate_22: true
+        estimate_23: true
+        estimate_24: true
+        estimate_25: true
+        estimate_26: true
+        estimate_27: true
+        estimate_28: true
+        estimate_29: true
+        estimate_3: true
+        estimate_30: true
+        estimate_31: true
+        estimate_32: true
+        estimate_33: true
+        estimate_34: true
+        estimate_35: true
+        estimate_36: true
+        estimate_37: true
+        estimate_38: true
+        estimate_39: true
+        estimate_4: true
+        estimate_40: true
+        estimate_41: true
+        estimate_42: true
+        estimate_43: true
+        estimate_44: true
+        estimate_45: true
+        estimate_46: true
+        estimate_47: true
+        estimate_48: true
+        estimate_49: true
+        estimate_5: true
+        estimate_50: true
+        estimate_51: true
+        estimate_52: true
+        estimate_53: true
+        estimate_54: true
+        estimate_55: true
+        estimate_56: true
+        estimate_57: true
+        estimate_58: true
+        estimate_59: true
+        estimate_6: true
+        estimate_60: true
+        estimate_61: true
+        estimate_62: true
+        estimate_63: true
+        estimate_64: true
+        estimate_65: true
+        estimate_66: true
+        estimate_67: true
+        estimate_68: true
+        estimate_69: true
+        estimate_7: true
+        estimate_70: true
+        estimate_71: true
+        estimate_72: true
+        estimate_73: true
+        estimate_74: true
+        estimate_75: true
+        estimate_76: true
+        estimate_77: true
+        estimate_78: true
+        estimate_79: true
+        estimate_8: true
+        estimate_80: true
+        estimate_81: true
+        estimate_82: true
+        estimate_83: true
+        estimate_84: true
+        estimate_85: true
+        estimate_86: true
+        estimate_87: true
+        estimate_88: true
+        estimate_89: true
+        estimate_9: true
+        estimate_90: true
+        estimate_91: true
+        estimate_92: true
+        estimate_93: true
+        estimate_94: true
+        estimate_95: true
+        estimate_96: true
+        estimate_97: true
+        estimate_98: true
+        estimate_99: true
+        known_base_0: true
+        known_base_1: true
+        known_base_2: true
+        known_base_3: true
+        known_base_4: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /base_markers
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+    - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /goal_pose
+    - Class: rviz_default_plugins/PublishPoint
+      Single click: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /clicked_point
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 16.429698944091797
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: -1.1564736366271973
+        Y: 1.0040189027786255
+        Z: 2.7095532417297363
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 1.0353970527648926
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+      Yaw: 4.750406742095947
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 1131
+  Hide Left Dock: false
+  Hide Right Dock: false
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000004000000000000015600000242fc020000000dfb0000001200530065006c0065006300740069006f006e000000007c0000027c0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000020c00000242000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d0065007200610100000341000000ce0000000000000000fb0000000c00430061006d0065007200610000000342000000cd0000000000000000fb0000000c00430061006d0065007200610100000342000000cd0000000000000000fb0000000c00430061006d0065007200610000000342000000cd0000000000000000fb000000100044006900730070006c006100790073000000020c00000242000000c900ffffff000000010000010f00000242fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000020c00000242000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000366000001c9fc0100000004fb0000000a0049006d0061006700650100000000000001b40000005e00fffffffb0000000a0049006d00610067006501000001ba000001ac0000005e00fffffffb0000000800540069006d00650000000000000003a3000002fb00fffffffb0000000a00560069006500770073030000004e00000080000002e10000019700000003000002fb000001a0fc0100000007fb0000000a0049006d0061006700650100000000000002fb0000000000000000fb0000000a0049006d0061006700650100000000000002fb0000000000000000fb0000000a0049006d0061006700650100000000000002fb0000000000000000fb0000000a0049006d0061006700650100000000000002fb0000000000000000fb0000000a0049006d0061006700650100000000000002fb0000000000000000fb0000000a0049006d0061006700650100000000000002fb0000000000000000fb0000000800540069006d00650100000000000004500000000000000000000003660000024200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Selection:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 870
+  X: 977
+  Y: 27

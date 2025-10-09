@@ -1,0 +1,30 @@
+cbr_fase3_fsm:
+  ros__parameters:
+    fictual_home_x: 1.2
+    fictual_home_y: -1.0
+    fictual_home_z: -0.6
+
+    takeoff_height: -2.0
+    return_home_timeout: 30.0
+
+    max_vertical_velocity: 1.0
+    max_horizontal_velocity: 1.0
+    position_tolerance: 0.05
+
+    control_speed: 0.15
+    yaw_speed: 0.35
+    search_yaw_range: 1.0472   # ~60 degrees
+    gesture_buffer_size: 20.0  # 10 is about 0.5 seconds at 20 Hz
+
+    landing_velocity_max: 0.5
+    landing_velocity_min: 0.2
+    max_base_height: -1.5
+    landing_timeout: 10.0
+
+    yaw_pid_kp: 0.6
+    yaw_pid_ki: 0.0
+    yaw_pid_kd: 0.06
+
+    climb_pid_kp: 0.9
+    climb_pid_ki: 0.0
+    climb_pid_kd: 0.09

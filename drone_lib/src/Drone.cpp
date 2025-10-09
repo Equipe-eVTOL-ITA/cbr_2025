@@ -26,6 +26,10 @@ Drone::Drone() : Node("Drone") {
 	telemetry_qos.best_effort();
 	telemetry_qos.durability(rclcpp::DurabilityPolicy::Volatile);
 
+	rclcpp::QoS gesture_qos(10);
+	gesture_qos.best_effort();
+	gesture_qos.durability(rclcpp::DurabilityPolicy::Volatile);
+
 	std::string vehicle_id_prefix = "";
 
 	// Essa parte será útil para múltiplos drones
@@ -299,6 +303,30 @@ Drone::Drone() : Node("Drone") {
 		vehicle_id_prefix + "/fmu/out/battery_status", px4_qos,
 		[this](const px4_msgs::msg::BatteryStatus::SharedPtr msg) {
 			this->battery_voltage_ = msg->voltage_filtered_v;
+		});
+
+	this->gesture_sub_ = this->create_subscription<custom_msgs::msg::Gesture>(
+		"/gesture/classification",
+		gesture_qos,
+		[this](custom_msgs::msg::Gesture::SharedPtr msg) {
+			this->gestures_ = msg->gestures;
+		// Debug logging
+        std::string debug = "Received gestures: [";
+        for (size_t i = 0; i < this->gestures_.size(); ++i) {
+            debug += "'" + this->gestures_[i] + "'";
+            if (i < this->gestures_.size() - 1) debug += ", ";
+        }
+        debug += "]";
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, debug.c_str());
+		}
+		);
+
+	this->hand_location_sub_ = this->create_subscription<custom_msgs::msg::HandLocation>(
+		"/gesture/hand_location",
+		gesture_qos,
+		[this](custom_msgs::msg::HandLocation::ConstSharedPtr msg) {
+			this->hand_location_x_ = msg->hand_x;
+			this->hand_location_y_ = msg->hand_y;
 		});
 	
 	// Status publisher timer (2Hz)
@@ -670,6 +698,20 @@ void Drone::log(const std::string &info) {
 	log_msg.message = info;
 	
 	log_pub_->publish(log_msg);
+}
+
+std::vector<std::string> Drone::getHandGestures() {
+	return gestures_;
+}
+
+std::array<float, 2> Drone::getHandLocation() {
+	return {hand_location_x_, hand_location_y_};
+}
+
+void Drone::resetHands() {
+	hand_location_x_ = 0.5f;
+	hand_location_y_ = 0.5f;
+	gestures_.assign(2, "");
 }
 
 void Drone::publishDroneStatus() {

@@ -1,0 +1,33 @@
+# Onboard computer
+
+oak_rgb_publisher:
+  ros__parameters:
+    publish_raw: true
+    publish_compressed: false
+    width: 800
+    height: 800
+    fps: 10
+    auto_exposure_compensation: 1
+
+gesture_classifier:
+  ros__parameters:
+    num_hands: 2
+    
+    # Full debug mode - publishes all frames at full resolution
+    full_debug_mode: true
+    
+    # Light debug mode - publishes at 3 Hz with reduced resolution for telemetry
+    light_debug_mode: false
+    light_debug_size: 400  # Resize debug images to 400x400 for bandwidth
+    light_debug_quality: 80  # JPEG compression quality (80% for good quality/size balance)
+
+telemetry_recorder:
+  ros__parameters:
+    recording:
+      enable: false
+      max_duration_minutes: 10
+      max_file_size_mb: 1000
+      include_images: false
+      recording_formats: ["rosbag"]
+      output_directory: "~/frtl_2025_ws/flight_logs/onboard"
+      autosave_time: 300.0  # Auto-save every 5 minutes
