@@ -74,9 +74,7 @@ public:
     std::string act(fsm::Blackboard &bb) override {
         
         AlignState::act(bb); // ja atualiza pos e orientacao
-
-        float current_yaw = this->orientation[2];
-
+        
         // timeout
         if (this->vision->lastPackageDetectionTime() > this->detection_timeout) {
             this->drone->log("PACKAGE DETECTION TIMEOUT EXCEEDED: " + std::to_string(this->detection_timeout) + "s.");
@@ -182,7 +180,7 @@ private:
 
     std::string executeYawAlignmentPhase(const BoundingBox& package_bbox) {
         // Fase 2: Alinhamento do yaw (rotação)
-        
+
         float desired_yaw = calculateDesiredYaw(package_bbox);
         float current_yaw = this->orientation[2];
         
