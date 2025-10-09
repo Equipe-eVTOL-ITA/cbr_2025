@@ -23,6 +23,8 @@ public:
         this->landing_timeout = *blackboard.get<float>("landing_timeout");
         this->start_time_ = std::chrono::steady_clock::now();
 
+        this->at_home = *blackboard.get<bool>("at_home");
+
         this->drone->log("Descending for " + std::to_string(this->landing_timeout) + " s.");
     }
     std::string act(fsm::Blackboard &blackboard) override {
@@ -32,6 +34,8 @@ public:
         auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(current_time - this->start_time_).count();
 
         if (elapsed_time > this->landing_timeout) {
+            if(this->at_home)
+                return "FINISHED";
             return "LANDED";
         }
 
@@ -76,4 +80,6 @@ private:
     float landing_velocity;
     float landing_timeout;
     std::chrono::steady_clock::time_point start_time_;
+
+    bool at_home;
 };

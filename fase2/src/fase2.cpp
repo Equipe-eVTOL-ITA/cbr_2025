@@ -22,6 +22,10 @@
 #include "fase2/states/landing_state.hpp"
 #include "fase2/states/package_state.hpp"
 #include "fase2/states/spiral_search_state.hpp"
+#include "fase2/states/deliver_approach_state.hpp"
+#include "fase2/states/catch_approach_state.hpp"
+#include "fase2/states/return_home_state.hpp"
+
 
 typedef std::map<std::string, std::variant<double, std::string, bool>> BlackboardMap;
 
@@ -104,6 +108,9 @@ public:
         this->add_state("LAND", std::make_unique<LandingState>());
         this->add_state("PACKAGE", std::make_unique<PackageState>());
         this->add_state("SPIRAL SEARCH", std::make_unique<SpiralSearchState>());
+        this->add_state("APPROACH TO DELIVER", std::make_unique<DeliverApproachState>());
+        this->add_state("APPROACH TO CATCH", std::make_unique<CatchApproachState>());
+        this->add_state("RETURN HOME", std::make_unique<ReturnHomeState>());
 
         this->set_initial_state("ARMING");
 
@@ -122,11 +129,13 @@ public:
 
         this->add_transitions("LAND", {
             {"LANDED", "PACKAGE"},
+            {"AT HOME", "FINISHED"},
             {"SEG FAULT", "ERROR"}
         });
 
         this->add_transitions("NEXT BASE", {
             {"ALIGN TO PACKAGE", "ALIGN TO PACKAGE"},
+            {"NO MORE BASES", "RETURN HOME"},
             {"NOT FOUND", "ERROR"},
             {"SEG FAULT", "ERROR"}
         });
@@ -144,19 +153,35 @@ public:
         });
 
         this->add_transitions("ALIGN TO PACKAGE", {
-            {"ALIGNED", "LAND"},
+            {"ALIGNED", "APPROACH TO CATCH"},
             {"LOST PACKAGE", "ERROR"},
             {"SEG FAULT", "ERROR"}
         });
 
         this->add_transitions("ALIGN TO BASE", {
-            {"ALIGNED", "LAND"},
+            {"ALIGNED", "APPROACH TO DELIVER"},
             {"LOST BASE", "FINISHED"},
             {"SEG FAULT", "ERROR"}
         });
 
+
+        this->add_transitions("APPROACH TO DELIVER", {
+            {"REACHED", "PACKAGE"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("APPROACH TO CATCH", {
+            {"REACHED", "PACKAGE"},
+            {"SEG FAULT", "ERROR"}
+        });
+
         this->add_transitions("PACKAGE", {
-            {"DONE", "ARMING"},
+            {"DONE", "TAKEOFF"},
+            {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("RETURN HOME", {
+            {"ARRIVED", "LAND"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -236,6 +261,10 @@ public:
             {"fictual_home_y", -1.0},
             {"fictual_home_z", -0.6},
             
+            // Return Home
+            {"at_home", false},
+            {"is_returning_home", false},
+
             // Coordenadas das bases (A, B, C)
             {"base_A_x", 3.0},
             {"base_A_y", -1.0},
@@ -315,7 +344,16 @@ public:
             {"current_waypoint_index", 0.0},      // Índice do waypoint atual
 
             // === Outras Configurações ===
-            {"descent_velocity", 0.15}          // Velocidade de descida
+            {"descent_velocity", 0.15},          // Velocidade de descida
+
+            // === Approach Params ===
+            {"deliver_approach_velocity", 0.5},           // Velocidade de aproximação
+            {"deliver_approach_height", -0.5},           // Altura de aproximação para entrega
+            {"deliver_approach_tolerance", 0.2},          // Tolerância para ponto de aproximação
+
+            {"catch_approach_velocity", 0.5},
+            {"catch_approach_height", 0.5},
+            {"catch_approach_tolerance", 0.5}
         };
 
         // Cria e configura a FSM com os parâmetros

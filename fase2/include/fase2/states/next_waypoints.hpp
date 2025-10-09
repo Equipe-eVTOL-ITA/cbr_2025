@@ -61,7 +61,7 @@ public:
 
         this->setTargetPoint(); // foi implementado nas classes filhas
         
-        if(*bb.get<bool>("are_there_packages_yet") == false)
+        if(*bb.get<bool>("are_there_packages_yet") == false && *bb.get<bool>("is_returning_home") == false)
             return "NO MORE BASES";
 
         bool arrived = move_local_by_waypoint(

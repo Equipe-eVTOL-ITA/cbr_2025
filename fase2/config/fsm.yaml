@@ -5,21 +5,25 @@ fase2_fsm:
     fictual_home_y: -1.0
     fictual_home_z: -0.6 # Remember z points Down
     
+    # Return Home
+    at_home: false
+    is_returning_home: false
+
     # Coordenadas das bases (A, B, C)
     base_A_x: 3.0
     base_A_y: -1.0
     base_B_x: 5.0
     base_B_y: -1.0
-    base_C_x: 7.0
+    base_C_x: 6.5
     base_C_y: -1.0
     
     # Coordenadas das entregas (A, B, C)
-    deliver_A_x: 0.0
+    deliver_A_x: 1.0
     deliver_A_y: -4.0
     deliver_B_x: 4.25
-    deliver_B_y: -5.0
-    deliver_C_x: 7.0
-    deliver_C_y: -6.0
+    deliver_B_y: -6.0
+    deliver_C_x: 6.5
+    deliver_C_y: -7.0
 
     # === Alturas e Velocidades ===
     takeoff_height: -2.5
@@ -85,6 +89,16 @@ fase2_fsm:
 
     # === Outras Configurações ===
     descent_velocity: 0.15          # Velocidade de descida
+
+    # === Approach Params ===
+    deliver_approach_velocity: 0.5           # Velocidade de aproximação
+    deliver_approach_height: -0.2           # Altura de aproximação para entrega
+    deliver_approach_tolerance: 0.2          # Tolerância para ponto de aproximação
+
+    catch_approach_velocity: 0.3           # Velocidade de aproximação
+    catch_approach_height: -1.7           # Altura de aproximação para entrega
+    catch_approach_tolerance: 0.1          # Tolerância para ponto de aproximação
+
 
 fase2_vision:
   ros__parameters:
