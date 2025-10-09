@@ -95,7 +95,7 @@ protected:
     int aligned_counter;
     int total_detected;
     int total_undetected;
-    float horizontal_distance;
+    float horizontal_distance; // é usado no align_package_state
 
     // timeout
     float detection_timeout;
@@ -133,7 +133,7 @@ protected:
     }
 
     bool executeAlignmentPosition(float tolerance_error, float tolerance_movement){
-        this->drone->log("Executing position alignment...");
+        //this->drone->log("Executing position alignment...");
 
         Eigen::Vector2d current_pos_2d = this->pos.head<2>();
         Eigen::Vector2d target = this->approx_target.head<2>();
@@ -154,7 +154,7 @@ protected:
     }
 
     bool executeAlignmentYaw(float desired_yaw, float tolerance){
-        this->drone->log("Executing yaw alignment...");
+        // this->drone->log("Executing yaw alignment...");
 
         float current_yaw = this->orientation[2];
         float yaw_error = normalizeYawError(desired_yaw - current_yaw);

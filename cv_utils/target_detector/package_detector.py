@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from typing import List, Dict, Tuple
 
-from target_detector import TargetDetector, run_detector
+from .target_detector import TargetDetector, run_detector
 
 
 class PackageDetector(TargetDetector):
@@ -28,12 +28,6 @@ class PackageDetector(TargetDetector):
         self._initialize_color_ranges()
         
         self.get_logger().info("Package detector initialized successfully")
-    
-    def _declare_ros_parameters(self):
-        """Override to set package_detector specific default topics"""
-        # Image subscription and detection publishing
-        self.declare_parameter('image_topic', '/vertical_camera/image_raw')
-        self.declare_parameter('detection_topic', '/package_detector/detections')  # Package detector specific topic
     
     def _setup_color_parameters(self):
         """Setup HSV color parameters for gray detection"""
@@ -271,17 +265,8 @@ class PackageDetector(TargetDetector):
 
 def main(args=None):
     """Main function for package detector"""
-    import rclpy
-    rclpy.init(args=args)
-    
-    try:
-        package_detector = PackageDetector()
-        rclpy.spin(package_detector)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        if rclpy.ok():
-            rclpy.shutdown()
+    package_detector = PackageDetector()
+    run_detector(package_detector, args)
 
 
 if __name__ == '__main__':

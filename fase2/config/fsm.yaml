@@ -42,7 +42,7 @@ fase2_fsm:
     takeoff_tolerance: 0.3        # Tolerância específica para takeoff (30cm)
     align_tolerance: 0.05         # Usado pelos align states
     align_base_tolerance: 0.05    # Tolerância específica para bases
-    align_package_tolerance: 0.02 # Tolerância específica para packages
+    align_package_tolerance: 0.1 # Tolerância específica para packages
     yaw_align_tolerance: 0.087    # ~5 graus para alinhamento rotacional
 
     # === Timeouts ===
@@ -98,6 +98,10 @@ fase2_fsm:
     catch_approach_velocity: 0.3           # Velocidade de aproximação
     catch_approach_height: -1.7           # Altura de aproximação para entrega
     catch_approach_tolerance: 0.1          # Tolerância para ponto de aproximação
+
+    # === Rough Alignment Params ===
+    rough_align_tolerance: 0.3          # Tolerância para alinhamento grosso
+    rough_movement_speed: 0.5           # Velocidade para movimento grosso
 
 
 fase2_vision:

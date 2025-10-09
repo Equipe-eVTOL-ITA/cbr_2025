@@ -17,7 +17,6 @@ private:
     // parâmetros específicos
     float height_to_ground;
     float mean_base_height;
-    std::string package_state;
     bool aligned;
 
 public:
@@ -31,13 +30,7 @@ public:
 
         AlignState::act(bb); // já atualiza pos e orientacao
         
-        float current_yaw = this->orientation[2];
-        
-        // debug periódico
-        if (this->print_counter % 5 == 0) {
-            this->drone->log("Base alignment - yaw=" + std::to_string(current_yaw));
-            updateDebugInfo();
-        }
+        // float current_yaw = this->orientation[2];
 
         // verificar timeout
         if (this->vision->lastBaseDetectionTime() > this->detection_timeout) {
@@ -53,18 +46,6 @@ public:
             this->approx_target = this->vision->getClosestBasePosition(
                 this->pos, this->orientation, this->mean_base_height, true
             );
-
-            // Debug detalhado da detecção da base
-            if (this->print_counter % 5 == 0) {
-                this->drone->log("Base Detection - target pos: [" + 
-                               std::to_string(this->approx_target.x()) + ", " + 
-                               std::to_string(this->approx_target.y()) + ", " + 
-                               std::to_string(this->approx_target.z()) + "]");
-                this->drone->log("Drone pos: [" + std::to_string(this->pos.x()) + 
-                               ", " + std::to_string(this->pos.y()) + ", " + 
-                               std::to_string(this->pos.z()) + "], orientation: " +
-                               std::to_string(this->orientation[2] * 180.0 / M_PI) + "°");
-            }
 
             this->aligned = executeAlignmentPosition(this->align_tolerance);
 
@@ -86,7 +67,6 @@ public:
             // sem detecção
             this->total_undetected++;
             this->no_detection_counter++;
-            this->horizontal_distance = 0.0f; // Sem detecção, sem cálculo de erro
             
             if (this->no_detection_counter > 3) {
                 this->drone->log("No base detection found. Maintaining position.");
@@ -117,15 +97,6 @@ protected:
         // parâmetros específicos para bases
         this->height_to_ground = *bb.get<float>("height_to_ground");
         this->mean_base_height = *bb.get<float>("mean_base_height");
-        this->package_state = *bb.get<std::string>("package_state");
-        
-        if (this->package_state == "get_package") {
-            this->drone->log("Aligning to package pickup base");
-        } else if (this->package_state == "deliver_package") {
-            this->drone->log("Aligning to package delivery base");
-        } else {
-            this->drone->log("Aligning to base - state: " + this->package_state);
-        }
     }
     
     std::string getAlignmentType() const override {

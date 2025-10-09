@@ -353,7 +353,11 @@ public:
 
             {"catch_approach_velocity", 0.5},
             {"catch_approach_height", 0.5},
-            {"catch_approach_tolerance", 0.5}
+            {"catch_approach_tolerance", 0.5},
+
+            {"rough_align_tolerance", 0.3},
+            {"rough_movement_speed", 0.5},
+            {"align_package_tolerance", 0.02}
         };
 
         // Cria e configura a FSM com os parâmetros
