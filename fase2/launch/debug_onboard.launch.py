@@ -67,9 +67,11 @@ def generate_launch_description():
     # Delay package detector by 1 second after base detector
     delayed_package_detector = TimerAction(period=1.0, actions=[package_detector_node])
 
+    # FSM node with GDB debug support
     fsm_node = Node(
         package='cbr_fase2',
         executable=LaunchConfiguration("mission"),
+        prefix='gdb --args',  # String simples funciona melhor
         parameters=[fsm_params],
         output='screen'
     )

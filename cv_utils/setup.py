@@ -19,6 +19,8 @@ setup(
             'barcode = barcode_detector.oak_bar:main',
             'qrcode = qrcode_detector.qrcode_detector:main',
             'base_detector = base_detector.base_detector:main',
+            'target_base_detector = target_detector.base_detector:main',
+            'target_package_detector = target_detector.package_detector:main'
         ],
     }
 )

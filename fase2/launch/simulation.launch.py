@@ -64,11 +64,14 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Base detector node
+        # Base detector node (using new target_detector framework)
     base_detector_node = Node(
         package='cbr_cv_utils',
-        executable='base_detector',
+        executable='target_base_detector',
         parameters=[simulation_params],
+        remappings=[
+            ('/vertical_camera/image_raw', '/vertical_camera')
+        ],
         output='screen'
     )
 

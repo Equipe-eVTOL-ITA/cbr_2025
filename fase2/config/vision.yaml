@@ -1,0 +1,121 @@
+# Vision Configuration for CBR 2025 Fase2
+# Unified configuration file for target detectors and vision node
+
+# VisionNode Configuration
+fase2_vision:
+  ros__parameters:
+    # Detection timeouts
+    timeout: 10.0
+    
+    # Detection topic configuration
+    enable_base_detection: true
+    base_detection_topic: "/base_detector/detections"
+    enable_package_detection: true
+    package_detection_topic: "/package_detector/detections"
+    
+    # Camera parameters (for the PUBLISHED 800x800 image)
+    fx: 600.0
+    fy: 600.0
+    cx: 400.0
+    cy: 400.0
+    image_width: 800
+    image_height: 800
+    
+    # Distortion parameters
+    dist_k1: 0.0
+    dist_k2: 0.0
+    dist_p1: 0.0
+    dist_p2: 0.0
+    dist_k3: 0.0
+    
+    # Camera extrinsics (pose in body frame)
+    camera_roll: 0.0
+    camera_pitch: 0.0
+    camera_yaw: 0.0
+    camera_tx: 0.0
+    camera_ty: 0.0
+    camera_tz: 0.0
+    
+    # Real-world object sizes
+    bbox_real_size: 1.0  # Base size in meters
+    
+    # Coordinate mode
+    bbox_is_normalized: true
+    
+    # Ground plane projection
+    mean_base_height: 0.0
+    accurate_project_to_ground: false
+    accurate_ground_z: 0.0
+
+# BaseDetector Configuration
+base_detector:
+  ros__parameters:
+    # Image topics
+    image_topic: "/vertical_camera"
+    detection_topic: "/base_detector/detections"
+    
+    # Blue color HSV ranges
+    blue_lower_h: 100
+    blue_lower_s: 80
+    blue_lower_v: 50
+    blue_upper_h: 130
+    blue_upper_s: 255
+    blue_upper_v: 255
+    blue_morph_kernel_size: 5
+    blue_morph_iterations: 3
+    
+    # Yellow color HSV ranges
+    yellow_lower_h: 20
+    yellow_lower_s: 100
+    yellow_lower_v: 100
+    yellow_upper_h: 30
+    yellow_upper_s: 255
+    yellow_upper_v: 255
+    yellow_morph_kernel_size: 3
+    yellow_morph_iterations: 2
+    
+    # Combined region detection
+    combined_min_area: 0.001
+    combined_max_area: 1.0
+    combined_aspect_ratio_min: 0.5
+    combined_aspect_ratio_max: 2.0
+    combination_kernel_size: 15
+    combination_iterations: 2
+    
+    # Debug configuration
+    full_debug_mode: false
+    light_debug_mode: true
+    light_debug_topic: "/telemetry/base_debug/compressed"
+    light_debug_size: 400
+    light_debug_quality: 80
+
+# PackageDetector Configuration
+package_detector:
+  ros__parameters:
+    # Image topics
+    image_topic: "/vertical_camera"
+    detection_topic: "/package_detector/detections"
+    
+    # Gray color HSV ranges for packages
+    gray_lower_h: 0
+    gray_lower_s: 0
+    gray_lower_v: 50
+    gray_upper_h: 180
+    gray_upper_s: 50
+    gray_upper_v: 150
+    gray_morph_kernel_size: 5
+    gray_morph_iterations: 2
+    
+    # Package detection parameters
+    package_min_area: 0.0005
+    package_max_area: 0.5
+    package_aspect_ratio_min: 0.3
+    package_aspect_ratio_max: 3.0
+    package_min_contour_points: 50
+    
+    # Debug configuration
+    full_debug_mode: false
+    light_debug_mode: true
+    light_debug_topic: "/telemetry/package_debug/compressed"
+    light_debug_size: 400
+    light_debug_quality: 80
