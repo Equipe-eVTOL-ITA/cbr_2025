@@ -25,6 +25,8 @@
 #include "fase2/states/deliver_approach_state.hpp"
 #include "fase2/states/catch_approach_state.hpp"
 #include "fase2/states/return_home_state.hpp"
+#include "fase2/states/return_to_last_state_state.hpp"
+#include "fase2/states/subidinha_state.hpp"
 
 
 typedef std::map<std::string, std::variant<double, std::string, bool>> BlackboardMap;
@@ -111,6 +113,8 @@ public:
         this->add_state("APPROACH TO DELIVER", std::make_unique<DeliverApproachState>());
         this->add_state("APPROACH TO CATCH", std::make_unique<CatchApproachState>());
         this->add_state("RETURN HOME", std::make_unique<ReturnHomeState>());
+        this->add_state("RETURN TO LAST STATE", std::make_unique<ReturnToLastStateState>());
+        this->add_state("SUBIDINHA", std::make_unique<SubidinhaState>());
 
         this->set_initial_state("ARMING");
 
@@ -155,6 +159,7 @@ public:
         this->add_transitions("ALIGN TO PACKAGE", {
             {"ALIGNED", "APPROACH TO CATCH"},
             {"LOST PACKAGE", "ERROR"},
+            {"SUBIDINHA", "SUBIDINHA"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -183,6 +188,15 @@ public:
         this->add_transitions("RETURN HOME", {
             {"ARRIVED", "LAND"},
             {"SEG FAULT", "ERROR"}
+        });
+
+        this->add_transitions("SUBIDINHA", {
+            {"SUBI", "RETURN TO LAST STATE"}
+        });
+
+        this->add_transitions("RETURN TO LAST STATE", {
+            {"ALIGN TO PACKAGE", "ALIGN TO PACKAGE"}
+            // implementar aqui os outros estados (é como se fosse uma função identidade)
         });
 
     }
@@ -292,6 +306,7 @@ public:
             {"landing_velocity", 0.5},
             {"search_velocity", 0.5},
             {"max_yaw_rate", 0.5},
+            {"yaw_align_rate_package", 0.2},
 
             // === Tolerâncias ===
             {"position_tolerance", 0.07},

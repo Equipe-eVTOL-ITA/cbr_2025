@@ -51,6 +51,7 @@ protected:
 
         this->fine_tolerance = *bb.get<float>("align_package_tolerance");
         this->package_base_dist_tolerance = *bb.get<float>("package_base_dist_tolerance");
+        this->yaw_align_rate_package = *bb.get<float>("yaw_align_rate_package");
     }
 
     // tipo de alinhamento para logs
@@ -65,6 +66,7 @@ public:
         
         this->current_phase = AlignmentPhase::ROUGH_POSITION;
         this->aligned_counter = 0;
+        this->yaw_aligned_counter = 0;
         this->yaw_pid.reset();
 
         this->rough_tolerance = 0.3f; // Tolerância maior para alinhamento grosso
@@ -95,13 +97,10 @@ public:
 
                 if(this->package_far_from_base_counter > 5){
                     this->drone->log("Package far from base. Distance: " + std::to_string(distance));
+
+                    bb.set<std::string>("last_state", "ALIGN TO PACKAGE");
                     
-                    // subindo um pouco para tentar achar a base
-                    Eigen::Vector3d new_pos = this->pos;
-                    new_pos.z() += 0.2f; // sobe 20 cm
-                    move_local_by_waypoint(this->drone, new_pos, 0.1f);
-                    
-                    return "";
+                    return "SUBIDINHA";
                 }
                 return "";
             } else {
@@ -119,9 +118,10 @@ public:
             
             // isso pode proteger de perder o package quando estiver rotacionando
             if (this->no_detection_counter > 3) {
-                this->drone->log("No package detection found. Returning to initial yaw.");
-                this->drone->setLocalPosition(this->pos.x(), this->pos.y(), this->pos.z(), this->initial_yaw);
-                return "";
+                this->drone->log("No package detection found. Dando uma subidinha");
+                
+                bb.set<std::string>("last_state", "ALIGN TO PACKAGE");    
+                return "SUBIDINHA";
             }
         }
 
@@ -135,6 +135,7 @@ private:
     float package_yaw_factor = 0.5f;
     float yaw_align_tolerance = 0.1f;
     float max_yaw_rate = 1.0f;
+    float yaw_align_rate_package;
 
     float rough_tolerance = 0.3f; // Tolerância maior para alinhamento grosso
     float movement_speed = 0.5f;  // Velocidade para movimento grosso
@@ -143,6 +144,7 @@ private:
     float package_base_dist_tolerance;
 
     int package_far_from_base_counter = 0;
+    int yaw_aligned_counter = 0;
 
     // estados do alinhamento sequencial
     enum class AlignmentPhase {
@@ -184,19 +186,31 @@ private:
         float desired_yaw = calculateDesiredYaw(package_bbox);
         float current_yaw = this->orientation[2];
         
-        // Calcular erro angular
         float yaw_error = desired_yaw - current_yaw;
-        
+
         // Normalizar erro para [-π, π]
         while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
         while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
         
-        if (executeAlignmentYaw(desired_yaw, this->yaw_align_tolerance)) {
-            this->current_phase = AlignmentPhase::FINE_POSITION;
-            this->drone->log("Phase transition: YAW_ALIGNMENT -> FINE_POSITION");
-            return "";
+        if (std::abs(yaw_error) < this->yaw_align_tolerance) {
+            this->yaw_aligned_counter++;
+            if (this->yaw_aligned_counter > 5) { // reduzir contador para resposta mais rápida
+                this->current_phase = AlignmentPhase::FINE_POSITION;
+                this->drone->log("Phase transition: YAW_ALIGNMENT -> FINE_POSITION");
+                this->yaw_aligned_counter = 0; // Reset counter
+                return "";
+            }
+        } else {
+            this->yaw_aligned_counter = 0;
         }
-
+        
+        // Configurar setpoint do PID e calcular yaw_rate
+        this->yaw_pid.setSetpoint(desired_yaw);
+        float yaw_rate = this->yaw_pid.compute(current_yaw);
+        yaw_rate = std::clamp(yaw_rate, -this->max_yaw_rate, this->max_yaw_rate);
+        
+        this->drone->setLocalVelocity(0.0f, 0.0f, 0.0f, yaw_rate);
+        
         return "";
     }
 
@@ -233,61 +247,10 @@ private:
 
     float calculateDesiredYaw(const BoundingBox& package_bbox) {
         float package_direction = package_bbox.rotation;
-        
-        // NORMALIZAR o ângulo do package primeiro
+
         while (package_direction > M_PI) package_direction -= 2.0 * M_PI;
         while (package_direction < -M_PI) package_direction += 2.0 * M_PI;
-        
-        // Testar diferentes transformações
-        float option1 = this->initial_yaw + package_direction;
-        float option2 = this->initial_yaw - package_direction;  
-        float option3 = this->initial_yaw + package_direction + M_PI/2;
-        float option4 = this->initial_yaw + package_direction - M_PI/2;
-        
-        // Normalizar todas as opções
-        auto normalize_angle = [](float angle) {
-            while (angle > M_PI) angle -= 2.0 * M_PI;
-            while (angle < -M_PI) angle += 2.0 * M_PI;
-            return angle;
-        };
-        
-        option1 = normalize_angle(option1);
-        option2 = normalize_angle(option2);
-        option3 = normalize_angle(option3);
-        option4 = normalize_angle(option4);
-        
-        // Escolher a opção com menor distância angular do yaw atual
-        float current_yaw = this->orientation[2];
-        std::vector<float> options = {option1, option2, option3, option4};
-        std::vector<std::string> option_names = {"+", "-", "+90°", "-90°"};
-        
-        float min_error = std::abs(normalize_angle(option1 - current_yaw));
-        int best_option = 0;
-        float desired_yaw = option1;
-        
-        for (int i = 1; i < 4; i++) {
-            float error = std::abs(normalize_angle(options[i] - current_yaw));
-            if (error < min_error) {
-                min_error = error;
-                best_option = i;
-                desired_yaw = options[i];
-            }
-        }
-        
-        // Log detalhado para debug
-        this->drone->log("=== YAW DEBUG ===");
-        this->drone->log("Package rotation (raw): " + std::to_string(package_bbox.rotation * 180.0 / M_PI) + "°");
-        this->drone->log("Package direction (normalized): " + std::to_string(package_direction * 180.0 / M_PI) + "°");
-        this->drone->log("Initial yaw: " + std::to_string(this->initial_yaw * 180.0 / M_PI) + "°");
-        this->drone->log("Current yaw: " + std::to_string(this->orientation[2] * 180.0 / M_PI) + "°");
-        this->drone->log("Option 1 (+): " + std::to_string(option1 * 180.0 / M_PI) + "°");
-        this->drone->log("Option 2 (-): " + std::to_string(option2 * 180.0 / M_PI) + "°");
-        this->drone->log("Option 3 (+90°): " + std::to_string(option3 * 180.0 / M_PI) + "°");
-        this->drone->log("Option 4 (-90°): " + std::to_string(option4 * 180.0 / M_PI) + "°");
-        this->drone->log("Best option: " + option_names[best_option] + " (error: " + std::to_string(min_error * 180.0 / M_PI) + "°)");
-        this->drone->log("Selected desired_yaw: " + std::to_string(desired_yaw * 180.0 / M_PI) + "°");
-        this->drone->log("================");
-        
-        return desired_yaw;
+
+        return package_direction;
     }
 };

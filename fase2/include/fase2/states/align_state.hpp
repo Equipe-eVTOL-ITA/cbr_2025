@@ -224,11 +224,13 @@ protected:
         return this->executeAlignmentPosition(tolerance, tolerance);
     }
 
-    bool executeAlignmentYaw(float desired_yaw, float tolerance){
+    bool executeAlignmentYaw(float desired_yaw, float tolerance, float yaw_rate){
         // this->drone->log("Executing yaw alignment...");
 
         float current_yaw = this->orientation[2];
         float yaw_error = normalizeYawError(desired_yaw - current_yaw);
+
+        this->drone->log("Erro do yaw: " + std::to_string(yaw_error));
 
         if (std::abs(yaw_error) < tolerance) {
             this->drone->setLocalVelocity(0.0f, 0.0f, 0.0f, 0.0f); // Stop rotation
@@ -236,9 +238,13 @@ protected:
         }
 
         // Usar rotação específica para yaw
-        rotateYaw(this->drone, desired_yaw);
+        rotateYaw(this->drone, desired_yaw, yaw_rate);
 
         return false;
+    }
+
+    bool executeAlignmentYaw(float desired_yaw, float tolerance){
+        return executeAlignmentYaw(desired_yaw, tolerance, 0.3f);
     }
 
     // normaliza erro de yaw para [-π, π]
