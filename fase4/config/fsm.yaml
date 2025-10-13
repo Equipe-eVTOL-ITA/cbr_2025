@@ -11,33 +11,59 @@ fase4_fsm:
 
     # checkpoints
     checkpoint_1_x: 3.0
-    checkpoint_1_y: -3.0
-    checkpoint_2_x: 5.0
-    checkpoint_2_y: -5.0
-    checkpoint_3_x: 7.0
-    checkpoint_3_y: -7.0
-    checkpoint_4_x: 9.0
-    checkpoint_4_y: -9.0
-    checkpoint_5_x: 11.0
-    checkpoint_5_y: -11.0
-    checkpoint_6_x: 13.0
-    checkpoint_6_y: -13.0
-    checkpoint_7_x: 15.0
-    checkpoint_7_y: -15.0
-    checkpoint_8_x: 17.0
-    checkpoint_8_y: -17.0
-    checkpoint_9_x: 19.0
-    checkpoint_9_y: -19.0
-    checkpoint_10_x: 21.0
-    checkpoint_10_y: -21.0
-    checkpoint_11_x: 23.0
-    checkpoint_11_y: -23.0
-    checkpoint_12_x: 25.0
-    checkpoint_12_y: -25.0
-    checkpoint_13_x: 27.0
-    checkpoint_13_y: -27.0
+    checkpoint_1_y: 0.0
+    checkpoint_1_espera_janela: true
+
+    checkpoint_2_x: 3.0
+    checkpoint_2_y: 0.0
+    checkpoint_2_espera_janela: false
+
+    checkpoint_3_x: 5.0
+    checkpoint_3_y: -1.0
+    checkpoint_3_espera_janela: false
+
+    checkpoint_4_x: 5.0
+    checkpoint_4_y: -1.0
+    checkpoint_4_espera_janela: false
+
+    checkpoint_5_x: 7.0
+    checkpoint_5_y: 0.0
+    checkpoint_5_espera_janela: true
+
+    checkpoint_6_x: 7.0
+    checkpoint_6_y: 0.0
+    checkpoint_6_espera_janela: true
+
+    checkpoint_7_x: 9.0
+    checkpoint_7_y: -1.0
+    checkpoint_7_espera_janela: true
+
+    checkpoint_8_x: 9.0
+    checkpoint_8_y: -1.0
+    checkpoint_8_espera_janela: true
+
+    checkpoint_9_x: 11.0
+    checkpoint_9_y: 0.0
+    checkpoint_9_espera_janela: false 
+
+    checkpoint_10_x: 11.0
+    checkpoint_10_y: 0.0
+    checkpoint_10_espera_janela: true
+
+    checkpoint_11_x: 13.0
+    checkpoint_11_y: -1.0
+    checkpoint_11_espera_janela: true
+
+    checkpoint_12_x: 13.0
+    checkpoint_12_y: -1.0
+    checkpoint_12_espera_janela: false
+
+    checkpoint_13_x: 13.0
+    checkpoint_13_y: -2.0
+    checkpoint_13_espera_janela: true
     # index
     checkpoint_index: 0.0
+    espera_janela: false
 
 
     # === Alturas e Velocidades ===

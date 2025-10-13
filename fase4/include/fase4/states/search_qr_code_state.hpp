@@ -8,6 +8,7 @@ class SearchQRCodeState : public fsm::State {
 private:
     std::shared_ptr<Drone> drone;
     std::vector<ArenaPoint> checkpoints;
+    std::vector<bool> checkpoints_espera_janela;
     int checkpoint_index;
 
     float velocity;
@@ -25,6 +26,7 @@ public:
 
         this->checkpoint_index = static_cast<int>(*bb.get<float>("checkpoint_index"));
         this->checkpoints = *bb.get<std::vector<ArenaPoint>>("checkpoints");
+        this->checkpoints_espera_janela = *bb.get<std::vector<bool>>("checkpoints_espera_janela");
 
         this->arrived_at_checkpoint = false;
 
@@ -45,8 +47,15 @@ public:
             this->velocity, 0.1f
         );
 
-        if(this->arrived_at_checkpoint)
+        if(this->arrived_at_checkpoint){
+            bool espera_janela = this->checkpoints_espera_janela[this->checkpoint_index];
+            bb.set<bool>("espera_janela", espera_janela);
+
+            if(static_cast<size_t>(this->checkpoint_index+1) < this->checkpoints.size())
+                bb.set<Eigen::Vector3d>("window_position", this->checkpoints[this->checkpoint_index+1].coordinates);
+
             return "BOUNCING SEARCH";
+        }
 
         return "";
     }

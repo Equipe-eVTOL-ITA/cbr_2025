@@ -21,6 +21,7 @@
 #include "fase4/states/landing_state.hpp"
 #include "fase4/states/search_qr_code_state.hpp"
 #include "fase4/states/bouncing_search_state.hpp"
+#include "fase4/states/look_to_window_state.hpp"
 
 typedef std::map<std::string, std::variant<double, std::string, bool>> BlackboardMap;
 
@@ -87,6 +88,7 @@ public:
         this->add_state("LAND", std::make_unique<LandingState>());
         this->add_state("SEARCH QR CODE", std::make_unique<SearchQRCodeState>());
         this->add_state("BOUNCING SEARCH", std::make_unique<BouncingSearchState>());
+        this->add_state("LOOK TO WINDOW", std::make_unique<LookToWindowState>());
 
         this->set_initial_state("ARMING");
 
@@ -107,6 +109,11 @@ public:
             {"ALIGN WITH WINDOW", "ALIGN WITH WINDOW"}
         });
 
+        this->add_transitions("LOOK TO WINDOW", {
+            {"LOOKING", "ALIGN WITH WINDOW"},
+            {"SEG FAULT", "ERROR"}
+        });
+        
         this->add_transitions("ALIGN WITH WINDOW", {
             {"ALIGNED", "THROUGH WINDOW"},
             {"NO WINDOW DETECTED", "LAND"},
@@ -127,6 +134,7 @@ public:
 
         this->add_transitions("BOUNCING SEARCH", {
             {"BOUNCING SEARCH COMPLETED", "SEARCH QR CODE"},
+            {"LOOK TO WINDOW", "LOOK TO WINDOW"},
             {"SEG FAULT", "ERROR"}
         });
 
@@ -149,6 +157,7 @@ private:
         float x, y;
 
         std::vector<ArenaPoint> points;
+        std::vector<bool> esperam_janelas;
 
         for(int i = 1; i <= number_of_checkpoints; i++){
             ArenaPoint point{}; // evitar vexing parse
@@ -161,8 +170,13 @@ private:
             point = ArenaPoint(x, y, h);
 
             points.push_back(point);
+
+            esperam_janelas.push_back(*this->blackboard_get<bool>("checkpoint_"+std::to_string(i)+"_espera_janela"));
         }
 
+        std::shared_ptr<std::vector<bool>> checkpoints_espera_janela = std::make_shared<std::vector<bool>>(esperam_janelas);
+        this->blackboard_set<std::shared_ptr<std::vector<bool>>>("checkpoints_espera_janela", checkpoints_espera_janela);
+        
         return points;
 
     }
@@ -192,30 +206,54 @@ public:
             // === 12 Checkpoints ===
             {"checkpoint_1_x", 3.0},
             {"checkpoint_1_y", -3.0},
+            {"checkpoint_1_espera_janela", true},
+
             {"checkpoint_2_x", 5.0},
             {"checkpoint_2_y", -5.0},
+            {"checkpoint_2_espera_janela", true},
+
             {"checkpoint_3_x", 7.0},
             {"checkpoint_3_y", -7.0},
+            {"checkpoint_3_espera_janela", true},
+
             {"checkpoint_4_x", 9.0},
             {"checkpoint_4_y", -9.0},
+            {"checkpoint_4_espera_janela", true},
+
             {"checkpoint_5_x", 11.0},
             {"checkpoint_5_y", -11.0},
+            {"checkpoint_5_espera_janela", true},
+
             {"checkpoint_6_x", 13.0},
             {"checkpoint_6_y", -13.0},
+            {"checkpoint_6_espera_janela", true},
+
             {"checkpoint_7_x", 15.0},
             {"checkpoint_7_y", -15.0},
+            {"checkpoint_7_espera_janela", true},
+
             {"checkpoint_8_x", 17.0},
             {"checkpoint_8_y", -17.0},
+            {"checkpoint_8_espera_janela", true},
+
             {"checkpoint_9_x", 19.0},
             {"checkpoint_9_y", -19.0},
+            {"checkpoint_9_espera_janela", true},
+
             {"checkpoint_10_x", 21.0},
             {"checkpoint_10_y", -21.0},
+            {"checkpoint_10_espera_janela", true},
+
             {"checkpoint_11_x", 23.0},
             {"checkpoint_11_y", -23.0},
+            {"checkpoint_11_espera_janela", true},
+
             {"checkpoint_12_x", 25.0},
             {"checkpoint_12_y", -25.0},
+            {"checkpoint_12_espera_janela", true},
             // index
             {"checkpoint_index", 0.0},
+            {"espera_janela", false},
 
             // === Alturas e Velocidades ===
             {"mean_height", -1.0},

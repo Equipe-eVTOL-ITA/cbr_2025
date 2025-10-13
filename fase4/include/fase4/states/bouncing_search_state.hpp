@@ -6,6 +6,9 @@
 #include <Eigen/Eigen>
 #include <map>
 
+#define ALTA true
+#define BAIXA false
+
 class BouncingSearchState : public fsm::State {
 private:
     std::shared_ptr<Drone> drone;
@@ -85,7 +88,7 @@ public:
         Eigen::Vector3d target_position = this->initial_position;
         target_position.z() = this->phase_info[this->current_phase].height;
         
-        this->scan_for_qr_code();
+        this->scan(bb);
 
         this->height_reached = move_local_by_waypoint(this->drone, target_position, 0.2f, 0.05f);
         if(this->height_reached){
@@ -97,6 +100,9 @@ public:
                 this->current_phase = static_cast<Phase>((static_cast<int>(this->current_phase) + 1));
 
                 if(this->current_phase == Phase::END) {
+                    if(*bb.get<bool>("espera_janela"))
+                        return "LOOK TO WINDOW";
+
                     return "BOUNCING SEARCH COMPLETED";
                 }
 
@@ -112,7 +118,8 @@ public:
 private:
     
 
-    void scan_for_qr_code() {
+    void scan(fsm::Blackboard &bb) {
+        (void) bb;
         // implementar aqui a lógica de escaneamento de QR code
         if (this->vision->isThereQRCodeDetection()) {
             QRCode qr = this->vision->getQRCode();

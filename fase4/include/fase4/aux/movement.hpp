@@ -147,3 +147,10 @@ bool rotateAngle(std::shared_ptr<Drone> drone, float angle, float yaw_rate = 0.3
 
     return rotateYaw(drone, target_yaw, yaw_rate, tolerance);
 }
+
+bool lookToPoint(std::shared_ptr<Drone> drone, Eigen::Vector3d goal_point, float yaw_rate = 0.3f, float tolerance = 0.05f) {
+    Eigen::Vector3d current_pos = drone->getLocalPosition();
+    float desired_yaw = std::atan2(goal_point.y() - current_pos.y(), goal_point.x() - current_pos.x());
+
+    return rotateYaw(drone, desired_yaw, yaw_rate, tolerance);
+}
