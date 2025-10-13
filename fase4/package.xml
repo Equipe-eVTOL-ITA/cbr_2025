@@ -10,6 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>cbr_drone_lib</depend>
+  <depend>cbr_2025_cv_utils</depend>
   <depend>fsm</depend>
   <depend>Eigen3</depend>
   <depend>rclcpp</depend>

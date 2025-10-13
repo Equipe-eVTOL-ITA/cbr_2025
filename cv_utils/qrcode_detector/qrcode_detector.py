@@ -2,16 +2,45 @@ import rclpy
 from rclpy.node import Node
 import cv2
 import numpy as np
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, Image
 from vision_msgs.msg import Detection2DArray, Detection2D, BoundingBox2D
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
+from cv_bridge import CvBridge
 import os
 from datetime import datetime
 
 class QRCodeDetectionNode(Node):
     def __init__(self):
         super().__init__('qr_code_detection_node')
+
+        # CV Bridge for converting between ROS and OpenCV images
+        self.bridge = CvBridge()
+
+        # Declare parameters for topic and message type
+        self.declare_parameter('image_topic', '/depth_camera/image_raw')
+        self.declare_parameter('use_compressed', False)
+        
+        image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
+        use_compressed = self.get_parameter('use_compressed').get_parameter_value().bool_value
+        
+        # ROS 2 Subscriber for camera images (use module-level imports to avoid scope issues)
+        if use_compressed:
+            self.image_sub = self.create_subscription(
+                CompressedImage,
+                image_topic,
+                self.compressed_image_callback,
+                10
+            )
+            self.get_logger().info(f'Subscribed to COMPRESSED image topic: {image_topic}')
+        else:
+            self.image_sub = self.create_subscription(
+                Image,
+                image_topic,
+                self.raw_image_callback,
+                10
+            )
+            self.get_logger().info(f'Subscribed to RAW image topic: {image_topic}')
 
         # ROS 2 Publishers
         self.qr_location_pub = self.create_publisher(Detection2DArray, '/vertical_classification', 10)
@@ -20,11 +49,6 @@ class QRCodeDetectionNode(Node):
 
         # OpenCV QR Code Detector
         self.qr_detector = cv2.QRCodeDetector()
-        
-        # Initialize camera (ajuste o índice conforme sua câmera)
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
         # Configurar diretório para salvar imagens
         self.save_directory = os.path.expanduser("~/qr_code_images")
@@ -54,12 +78,38 @@ class QRCodeDetectionNode(Node):
         self.last_qr_content = ""
         self.last_qr_bbox = None
 
-        self.timer = self.create_timer(0.1, self.detect_qr_codes)  # 10 Hz
+        self.get_logger().info("QR Code Detector Node initialized")
 
-    def detect_qr_codes(self):
-        ret, frame = self.cap.read()
-        if not ret:
-            return
+    def raw_image_callback(self, msg):
+        """Callback for raw (uncompressed) images from Gazebo"""
+        try:
+            # Convert ROS Image message to OpenCV format
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.detect_qr_codes(frame)
+        except Exception as e:
+            self.get_logger().error(f"Error in raw_image_callback: {str(e)}")
+    
+    def compressed_image_callback(self, msg):
+        """Callback for compressed images (original callback)"""
+        try:
+            # Convert compressed image to OpenCV format
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if frame is None:
+                self.get_logger().warn("Failed to decode image")
+                return
+            
+            self.detect_qr_codes(frame)
+            
+        except Exception as e:
+            self.get_logger().error(f"Error in compressed_image_callback: {str(e)}")
+    
+    def image_callback(self, msg):
+        """Legacy callback - redirects to compressed callback for backward compatibility"""
+        self.compressed_image_callback(msg)
+
+    def detect_qr_codes(self, frame):
+        """Process frame to detect QR codes"""
 
         # Armazenar último frame para serviço de captura
         self.last_frame = frame.copy()
@@ -257,8 +307,8 @@ class QRCodeDetectionNode(Node):
         return response
 
     def __del__(self):
-        if hasattr(self, 'cap'):
-            self.cap.release()
+        # No need to release camera since we're using ROS2 topic subscription
+        pass
 
 
 def main(args=None):

@@ -12,9 +12,9 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    pkg_fase2   = get_package_share_directory('cbr_fase2')
-    ground_station_params      = os.path.join(pkg_fase2, "config", "ground_station.yaml")
-    rviz_cfg = os.path.join(pkg_fase2, 'launch', 'ground_station.rviz')
+    pkg_fase4   = get_package_share_directory('cbr_fase4')
+    ground_station_params      = os.path.join(pkg_fase4, "config", "ground_station.yaml")
+    rviz_cfg = os.path.join(pkg_fase4, 'launch', 'ground_station.rviz')
 
     # Telemetry Handler - core telemetry processing
     telemetry_handler_node = Node(
@@ -48,9 +48,20 @@ def generate_launch_description():
         arguments=['-d', rviz_cfg]
     )
 
+    # Image transport republishers to expose compressed streams for tools
+    depth_republish_node = Node(
+        package='image_transport',
+        executable='republish',
+        # Convert raw depth to compressedDepth on the same base topic
+        arguments=['raw', 'compressedDepth', '--ros-args', '-r', 'in:=/depth_camera/image_raw', '-r', 'out:=/depth_camera'],
+        output='screen'
+    )
+
+
     return LaunchDescription([
         telemetry_handler_node,        
         telemetry_dashboard_node,
         telemetry_recorder_node,
-        rviz_node
+        rviz_node,
+        depth_republish_node
     ])

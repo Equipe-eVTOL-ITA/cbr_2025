@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-package_name = 'cbr_cv_utils'
+package_name = 'cbr_2025_cv_utils'
 
 setup(
     name=package_name,
@@ -20,7 +20,9 @@ setup(
             'qrcode = qrcode_detector.qrcode_detector:main',
             'base_detector = base_detector.base_detector:main',
             'target_base_detector = target_detector.base_detector:main',
-            'target_package_detector = target_detector.package_detector:main'
+            'target_package_detector = target_detector.package_detector:main',
+            'window_detector = window_detector.window_detector:main',
+            'qr_code_detector = qrcode_detector.qrcode_detector:main'
         ],
     }
 )

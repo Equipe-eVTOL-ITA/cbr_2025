@@ -9,10 +9,12 @@ private:
 public:
     AlignWindowState() : AlignState() {}
 
-    void on_enter(fsm::Blackboard &bb){
+    void on_enter(fsm::Blackboard &bb) override {
         AlignState::on_enter(bb);
         this->aligned = false;
         this->janela_counter = static_cast<int>(*bb.get<float>("janela_counter"));
+
+        this->drone->log("STATE: ALIGN WITH WINDOW STATE");
     }
     
     std::string act(fsm::Blackboard &bb) override {
@@ -24,6 +26,7 @@ public:
                 this->drone->log("ALIGN_WINDOW: Waiting for window detection...");
             }
 
+            this->drone->log("No window detected...");
             return "NO WINDOW DETECTED";
         }
 

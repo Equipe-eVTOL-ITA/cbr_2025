@@ -78,6 +78,14 @@ public:
         std::shared_ptr<std::vector<ArenaPoint>> checkpoints = std::make_shared<std::vector<ArenaPoint>>(this->config_checkpoints(12));
         this->blackboard_set<std::shared_ptr<std::vector<ArenaPoint>>>("checkpoints", checkpoints);
 
+        // Inicializar window_position com valor padrão
+        Eigen::Vector3d default_window_position(0.0, 0.0, 0.0);
+        this->blackboard_set<Eigen::Vector3d>("window_position", default_window_position);
+
+        ArenaPoint front_of_the_window = this->setFrontOfTheWindow();
+        this->blackboard_set<ArenaPoint>("front_of_the_window", front_of_the_window);
+        
+
         // Máquina de Estados
         this->add_state("ARMING", std::make_unique<ArmingState>());
         this->add_state("TAKEOFF", std::make_unique<TakeoffState>());
@@ -127,7 +135,7 @@ public:
         });
 
         this->add_transitions("SEARCH QR CODE", {
-            {"BOUNCING SEARCH", "SEARCH QR CODE"},
+            {"BOUNCING SEARCH", "BOUNCING SEARCH"},
             {"RETURN HOME", "RETURN HOME"},
             {"SEG FAULT", "ERROR"}
         });
@@ -151,6 +159,19 @@ public:
     }
 
 private:
+
+    ArenaPoint setFrontOfTheWindow() {
+        ArenaPoint point{};
+        
+        float x = *this->blackboard_get<float>("front_of_the_window_x");
+        float y = *this->blackboard_get<float>("front_of_the_window_y");
+        float z = *this->blackboard_get<float>("mean_height");
+        
+        point = ArenaPoint(x, y, z);
+
+        return point;
+    }
+
 
     std::vector<ArenaPoint> config_checkpoints(int number_of_checkpoints){
         float h = *this->blackboard_get<float>("mean_height");
@@ -203,7 +224,11 @@ public:
             {"at_home", false},
             {"is_returning_home", false},
 
-            // === 12 Checkpoints ===
+            // front of the first window
+            {"front_of_the_window_x", 3.0},
+            {"front_of_the_window_y", 0.0},
+
+            // === 13 Checkpoints ===
             {"checkpoint_1_x", 3.0},
             {"checkpoint_1_y", -3.0},
             {"checkpoint_1_espera_janela", true},
@@ -267,6 +292,7 @@ public:
             // === Tolerâncias ===
             {"position_tolerance", 0.07},
             {"takeoff_tolerance", 0.3},        // Tolerância específica para takeoff (30cm)
+            {"align_tolerance", 0.15},         // Tolerância para alinhamento com objetos (15cm)
 
             // === Timeouts ===
             {"detection_timeout", 10.0},
@@ -297,15 +323,35 @@ public:
             {"pass_through_distance", 1.5},    // Distância a percorrer ao passar pela janela
             {"pass_through_tolerance", 0.2},   // Tolerância para considerar que passou pela janela
             {"pass_through_timeout", 10.0},    // Timeout para passar pela janela
+
+            // window alignment offsets
+            {"window_align_offset_x", 0.0},
+            {"window_align_offset_y", 0.0},
+
+            // state machine control
+            {"last_state", std::string("")},   // Para return_to_last_state_state
             
             // === Outras Configurações ===
-            {"enter_house_aligned", false},
             {"descent_velocity", 0.15},          // Velocidade de descida
+            {"align_descent_velocity", 0.12},    // Velocidade de descida durante alinhamento
 
             // === Parâmetros Bouncing Search ===
             {"up_height", -0.5},                 // Altura para fases "UP" (metros, negativo para cima no NED)
             {"down_height", -1.5},               // Altura para fases "DOWN" (metros, negativo para baixo no NED)
-            {"middle_height", -1.0}             // Altura para fases "MIDDLE" (metros, intermediária)
+            {"middle_height", -1.0},             // Altura para fases "MIDDLE" (metros, intermediária)
+
+            // === Parâmetros das Janelas ===
+            {"janela_counter", 0.0},
+            {"janela_A", true},
+            {"janela_B", false},
+            {"janela_C", false},
+            {"janela_D", true},
+            {"janela_E", false},
+            {"janela_F", true},
+            {"janela_G", false},
+            {"janela_H", true},
+            {"janela_alta_height", 1.0},
+            {"janela_baixa_height", 0.5}
         };
 
         // Cria e configura a FSM com os parâmetros

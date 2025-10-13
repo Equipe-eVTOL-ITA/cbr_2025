@@ -59,14 +59,21 @@ public:
         if(diff.norm() < this->position_tolerance) {
             if(!this->take_off_taken) {
                 bb.set<bool>("initial_takeoff_taken", true);
+                this->drone->log("Initial takeoff taken. Next step is to enter the house!");
                 return "ENTER HOUSE";
             }
  
-           return "TAKENOFF";
+            this->drone->log("I've takenoff sucessfully!");
+            return "TAKENOFF";
         }
 
         move_local_by_waypoint(this->drone, this->goal, this->max_velocity);
 
         return "";
+    }
+
+    void on_exit(fsm::Blackboard &bb) override {
+        (void) bb;
+        this->drone->log("Takeoff state completed!");
     }
 };

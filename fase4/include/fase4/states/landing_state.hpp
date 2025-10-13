@@ -38,6 +38,11 @@ public:
         return "";
     }
 
+    void on_exit(fsm::Blackboard &bb) override {
+        (void) bb;
+        this->drone->log("Landing state completed!");
+    }
+
 private:
     std::shared_ptr<Drone> drone;
 

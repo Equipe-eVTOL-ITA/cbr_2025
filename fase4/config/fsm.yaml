@@ -9,57 +9,61 @@ fase4_fsm:
     at_home: false
     is_returning_home: false
 
+    # front of the first window
+    front_of_the_window_x: 1.0
+    front_of_the_window_y: -1.5
+
     # checkpoints
     checkpoint_1_x: 3.0
-    checkpoint_1_y: 0.0
+    checkpoint_1_y: -1.5
     checkpoint_1_espera_janela: true
 
     checkpoint_2_x: 3.0
-    checkpoint_2_y: 0.0
+    checkpoint_2_y: -1.5
     checkpoint_2_espera_janela: false
 
     checkpoint_3_x: 5.0
-    checkpoint_3_y: -1.0
+    checkpoint_3_y: -2.5
     checkpoint_3_espera_janela: false
 
     checkpoint_4_x: 5.0
-    checkpoint_4_y: -1.0
+    checkpoint_4_y: -2.5
     checkpoint_4_espera_janela: false
 
     checkpoint_5_x: 7.0
-    checkpoint_5_y: 0.0
+    checkpoint_5_y: -1.5
     checkpoint_5_espera_janela: true
 
     checkpoint_6_x: 7.0
-    checkpoint_6_y: 0.0
+    checkpoint_6_y: -1.5
     checkpoint_6_espera_janela: true
 
     checkpoint_7_x: 9.0
-    checkpoint_7_y: -1.0
+    checkpoint_7_y: -2.5
     checkpoint_7_espera_janela: true
 
     checkpoint_8_x: 9.0
-    checkpoint_8_y: -1.0
+    checkpoint_8_y: -2.5
     checkpoint_8_espera_janela: true
 
     checkpoint_9_x: 11.0
-    checkpoint_9_y: 0.0
+    checkpoint_9_y: -1.5
     checkpoint_9_espera_janela: false 
 
     checkpoint_10_x: 11.0
-    checkpoint_10_y: 0.0
+    checkpoint_10_y: -1.5
     checkpoint_10_espera_janela: true
 
     checkpoint_11_x: 13.0
-    checkpoint_11_y: -1.0
+    checkpoint_11_y: -2.5
     checkpoint_11_espera_janela: true
 
     checkpoint_12_x: 13.0
-    checkpoint_12_y: -1.0
+    checkpoint_12_y: -2.5
     checkpoint_12_espera_janela: false
 
     checkpoint_13_x: 13.0
-    checkpoint_13_y: -2.0
+    checkpoint_13_y: -3.5
     checkpoint_13_espera_janela: true
     # index
     checkpoint_index: 0.0
@@ -78,6 +82,7 @@ fase4_fsm:
     # === Tolerâncias ===
     position_tolerance: 0.07
     takeoff_tolerance: 0.3        # Tolerância específica para takeoff (30cm)
+    align_tolerance: 0.15         # Tolerância para alinhamento com objetos (15cm)
 
     # === Timeouts ===
     detection_timeout: 10.0
@@ -105,6 +110,7 @@ fase4_fsm:
 
     # === Outras Configurações ===
     descent_velocity: 0.15          # Velocidade de descida
+    align_descent_velocity: 0.12    # Velocidade de descida durante alinhamento
 
     # === Parâmetros Bouncing Search ===
     up_height: -1.0                 # Altura para fases "UP" (metros, negativo para cima no NED)
@@ -117,7 +123,7 @@ fase4_fsm:
     janela_A: true
     janela_B: false
     janela_C: false
-    janela:D: true
+    janela_D: true
     janela_E: false
     janela_F: true
     janela_G: false
@@ -126,14 +132,15 @@ fase4_fsm:
     janela_alta_height: 1.0
     janela_baixa_height: 0.5
 
-    # enter house state
-    enter_house_alined: false
-
     # through window state
     pass_through_speed: 0.3
     pass_through_distance: 1.5
     pass_through_tolerance: 0.2
     pass_through_timeout: 10.0
+
+    # window alignment offsets
+    window_align_offset_x: 0.0
+    window_align_offset_y: 0.0
 
 fase4_vision:
   ros__parameters:

@@ -1,19 +1,19 @@
-# Vision Configuration for CBR 2025 Fase2
-# Unified configuration file for target detectors and vision node
+# Vision Configuration for CBR 2025 Fase4
+# Configuration for window detection using frontal depth camera
 
-# VisionNode Configuration
+# VisionNode Configuration for Fase4
 fase4_vision:
   ros__parameters:
-    # Detection timeouts
+    # Window and QR detection timeouts
     timeout: 10.0
     
-    # Detection topic configuration
-    enable_base_detection: true
-    base_detection_topic: "/base_detector/detections"
-    enable_package_detection: true
-    package_detection_topic: "/package_detector/detections"
+    # Detection topic configuration for fase4
+    enable_base_detection: false
+    enable_package_detection: false
+    enable_window_detection: true
+    enable_qr_detection: true
     
-    # Camera parameters (for the PUBLISHED 800x800 image)
+    # FRONTAL depth camera parameters (for window detection)
     fx: 600.0
     fy: 600.0
     cx: 400.0
@@ -28,18 +28,19 @@ fase4_vision:
     dist_p2: 0.0
     dist_k3: 0.0
     
-    # Camera extrinsics (pose in body frame)
+    # FRONTAL camera extrinsics (facing forward for window detection)
     camera_roll: 0.0
-    camera_pitch: 0.0
+    camera_pitch: 0.0      # Level camera (not downward facing)
     camera_yaw: 0.0
-    camera_tx: 0.0
+    camera_tx: 0.1         # Slightly forward from center
     camera_ty: 0.0
     camera_tz: 0.0
     
-    # Real-world object sizes
-    bbox_real_size: 1.0  # Base size in meters
+    # Window detection parameters
+    known_window_height: 1.5   # Expected window height in meters
+    known_window_width: 1.0    # Expected window width in meters
     
-    # Coordinate mode
+    # Coordinate mode for window detection
     bbox_is_normalized: true
     
     # Ground plane projection
@@ -47,75 +48,44 @@ fase4_vision:
     accurate_project_to_ground: false
     accurate_ground_z: 0.0
 
-# BaseDetector Configuration
-base_detector:
+# WindowDetector Configuration for Frontal Depth Camera
+window_detector:
   ros__parameters:
-    # Image topics
-    image_topic: "/vertical_camera"
-    detection_topic: "/base_detector/detections"
+    # FRONTAL depth camera topics (from Gazebo bridge)
+    depth_topic: "/depth_camera/image_raw"
+    use_compressed: false  # Gazebo publishes raw images
+    detection_topic: "/window_found"
+    centroid_topic: "/centroid"
+    threshold_topic: "/threshold"
     
-    # Blue color HSV ranges
-    blue_lower_h: 100
-    blue_lower_s: 80
-    blue_lower_v: 50
-    blue_upper_h: 130
-    blue_upper_s: 255
-    blue_upper_v: 255
-    blue_morph_kernel_size: 5
-    blue_morph_iterations: 3
+    # Window detection parameters
+    detection_threshold: 100      # Depth threshold for window detection
+    min_window_area: 1000        # Minimum window area in pixels
+    max_window_area: 50000       # Maximum window area in pixels
+    window_aspect_ratio_min: 0.5 # Minimum aspect ratio for windows
+    window_aspect_ratio_max: 3.0 # Maximum aspect ratio for windows
     
-    # Yellow color HSV ranges
-    yellow_lower_h: 20
-    yellow_lower_s: 100
-    yellow_lower_v: 100
-    yellow_upper_h: 30
-    yellow_upper_s: 255
-    yellow_upper_v: 255
-    yellow_morph_kernel_size: 3
-    yellow_morph_iterations: 2
+    # Morphological operations
+    morph_kernel_size: 5         # Kernel size for morphological operations
+    morph_iterations: 2          # Number of morphological iterations
     
-    # Combined region detection
-    combined_min_area: 0.001
-    combined_max_area: 1.0
-    combined_aspect_ratio_min: 0.5
-    combined_aspect_ratio_max: 2.0
-    combination_kernel_size: 15
-    combination_iterations: 2
-    
-    # Debug configuration
-    full_debug_mode: false
-    light_debug_mode: true
-    light_debug_topic: "/telemetry/base_debug/compressed"
-    light_debug_size: 400
-    light_debug_quality: 80
+    # Debug mode
+    debug_mode: true
+    debug_topic: "/window_debug/compressed"
 
-# PackageDetector Configuration
-package_detector:
+# QRCodeDetector Configuration for Frontal Depth Camera  
+qr_code_detector:
   ros__parameters:
-    # Image topics
-    image_topic: "/vertical_camera"
-    detection_topic: "/package_detector/detections"
+    # Use OAK RGB for QR detection
+    image_topic: "/oak/camera/image/raw"
+    use_compressed: false
+    detection_topic: "/vertical_classification"
+    qr_string_topic: "/qr_code_string"
     
-    # Gray color HSV ranges for packages
-    gray_lower_h: 0
-    gray_lower_s: 0
-    gray_lower_v: 50
-    gray_upper_h: 180
-    gray_upper_s: 50
-    gray_upper_v: 150
-    gray_morph_kernel_size: 5
-    gray_morph_iterations: 2
+    # QR detection parameters
+    detection_confidence: 0.8
+    max_detection_distance: 5.0
     
-    # Package detection parameters
-    package_min_area: 0.0005
-    package_max_area: 0.5
-    package_aspect_ratio_min: 0.3
-    package_aspect_ratio_max: 3.0
-    package_min_contour_points: 50
-    
-    # Debug configuration
-    full_debug_mode: false
-    light_debug_mode: true
-    light_debug_topic: "/telemetry/package_debug/compressed"
-    light_debug_size: 400
-    light_debug_quality: 80
+    # Debug mode
+    debug_mode: true
+    debug_topic: "/qr_debug/compressed"
