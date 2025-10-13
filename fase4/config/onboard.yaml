@@ -1,0 +1,68 @@
+# Onboard computer
+
+oak_rgb_publisher:
+  ros__parameters:
+    publish_raw: true
+    publish_compressed: false
+    width: 800
+    height: 800
+    fps: 10
+    auto_exposure_compensation: 1
+
+
+base_detector:
+  ros__parameters:
+    # Image subscription and Detector publisher topics
+    image_topic: '/vertical_camera'
+    detection_topic: '/vertical_camera/classification'
+
+    # Full debug mode
+    full_debug_mode: false
+
+    # Light debug mode
+    light_debug_mode: true
+    light_debug_topic: '/telemetry/camera_debug/compressed'
+    light_debug_size: 400  # Resize debug images to 400x400 for bandwidth
+    light_debug_quality: 75  # JPEG compression quality (75% for good quality/size balance)
+    
+    # Morphological operations (color-specific)
+    yellow_morph_kernel_size: 3
+    yellow_morph_iterations: 2
+    blue_morph_kernel_size: 5
+    blue_morph_iterations: 3
+    
+    # HSV color ranges (same as base_detector)
+    blue_lower_h: 100
+    blue_lower_s: 80
+    blue_lower_v: 40
+    blue_upper_h: 130
+    blue_upper_s: 255
+    blue_upper_v: 255
+    
+    yellow_lower_h: 20
+    yellow_lower_s: 120
+    yellow_lower_v: 70
+    yellow_upper_h: 30
+    yellow_upper_s: 255
+    yellow_upper_v: 255
+    
+    # Detection constraints for combined regions
+    combined_min_area: 0.04
+    combined_max_area: 1.0
+    combined_aspect_ratio_min: 0.5
+    combined_aspect_ratio_max: 2.0
+    
+    # Dilation parameters for combining adjacent color regions
+    combination_kernel_size: 15
+    combination_iterations: 1
+
+telemetry_recorder:
+  ros__parameters:
+    recording:
+      enable: false
+      max_duration_minutes: 10
+      max_file_size_mb: 1000
+      include_images: false
+      recording_formats: ["rosbag"]
+      output_directory: "~/frtl_2025_ws/flight_logs/onboard"
+      autosave_time: 300.0  # Auto-save every 5 minutes

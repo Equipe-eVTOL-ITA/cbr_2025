@@ -1,13 +1,13 @@
 import rclpy
 from rclpy.node import Node
-from roboflowoak import RoboflowOak
 import cv2
 import numpy as np
 from sensor_msgs.msg import CompressedImage
-from vision_msgs.msg import Detection2DArray, Detection2D
-from vision_msgs.msg import BoundingBox2D
+from vision_msgs.msg import Detection2DArray, Detection2D, BoundingBox2D
 from std_msgs.msg import String
-from pyzbar.pyzbar import decode  # QR Code reader
+from std_srvs.srv import Trigger
+import os
+from datetime import datetime
 
 class QRCodeDetectionNode(Node):
     def __init__(self):
@@ -18,79 +18,247 @@ class QRCodeDetectionNode(Node):
         self.annotated_image_pub = self.create_publisher(CompressedImage, '/annotated_image/compressed', 10)
         self.qr_string_pub = self.create_publisher(String, '/qr_code_string', 10)
 
-        # Roboflow Model Configuration
-        self.rf = RoboflowOak(
-            model="qr-code-80bee", confidence=0.5, overlap=0.5,
-            version="1", api_key="FdbPQV6UvRCTuTrFHVpY", rgb=True,
-            depth=False, device=None, blocking=True
-        )
+        # OpenCV QR Code Detector
+        self.qr_detector = cv2.QRCodeDetector()
+        
+        # Initialize camera (ajuste o índice conforme sua câmera)
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-        self.timer = self.create_timer(0.1, self.detect_qr_codes)  # 10 Hz processing
+        # Configurar diretório para salvar imagens
+        self.save_directory = os.path.expanduser("~/qr_code_images")
+        os.makedirs(self.save_directory, exist_ok=True)
+        
+        # Controle de salvamento (evita salvar múltiplas imagens do mesmo QR)
+        self.last_saved_content = ""
+        self.save_cooldown = 0
+        
+        # Parâmetros configuráveis
+        self.declare_parameter('save_images', True)
+        self.declare_parameter('save_cooldown_frames', 50)  # Evita salvar o mesmo QR por 5s
+        
+        self.save_images_enabled = self.get_parameter('save_images').get_parameter_value().bool_value
+        self.cooldown_frames = self.get_parameter('save_cooldown_frames').get_parameter_value().integer_value
+
+        # Serviço para capturar imagem sob demanda
+        self.capture_service = self.create_service(
+            Trigger, 
+            '/capture_qr_image', 
+            self.capture_qr_image_callback
+        )
+        
+        # Armazenar último frame para captura sob demanda
+        self.last_frame = None
+        self.last_qr_detected = False
+        self.last_qr_content = ""
+        self.last_qr_bbox = None
+
+        self.timer = self.create_timer(0.1, self.detect_qr_codes)  # 10 Hz
 
     def detect_qr_codes(self):
-        result, frame, raw_frame, _ = self.rf.detect()
+        ret, frame = self.cap.read()
+        if not ret:
+            return
 
-        # Predictions from Roboflow
-        predictions = result["predictions"]
+        # Armazenar último frame para serviço de captura
+        self.last_frame = frame.copy()
 
-        # Annotate and process predictions
+        # Detectar e decodificar QR Codes
+        decoded_text, bbox, _ = self.qr_detector.detectAndDecode(frame)
+        
         detections_msg = Detection2DArray()
+        detections_msg.header.stamp = self.get_clock().now().to_msg()
         annotated_frame = frame.copy()
 
-        if predictions:
-            for prediction in predictions:
-                x_center = prediction.x / frame.shape[1]
-                y_center = prediction.y / frame.shape[0]
-                width = prediction.width / frame.shape[1]
-                height = prediction.height / frame.shape[0]
+        if bbox is not None and len(decoded_text) > 0:
+            # QR Code detectado
+            bbox = bbox[0].astype(int)  # Converter para inteiros
+            
+            # Calcular bounding box retangular
+            x_min = int(np.min(bbox[:, 0]))
+            y_min = int(np.min(bbox[:, 1]))
+            x_max = int(np.max(bbox[:, 0]))
+            y_max = int(np.max(bbox[:, 1]))
+            
+            # Coordenadas normalizadas
+            height, width = frame.shape[:2]
+            x_center = ((x_min + x_max) / 2) / width
+            y_center = ((y_min + y_max) / 2) / height
+            bbox_width = (x_max - x_min) / width
+            bbox_height = (y_max - y_min) / height
 
-                # Add bounding box to detections
-                detection = Detection2D()
-                detection.bbox = BoundingBox2D()
-                detection.bbox.center.position.x = x_center
-                detection.bbox.center.position.y = y_center
-                detection.bbox.size_x = width
-                detection.bbox.size_y = height
-                detections_msg.detections.append(detection)
+            # Criar Detection2D
+            detection = Detection2D()
+            detection.bbox = BoundingBox2D()
+            detection.bbox.center.position.x = x_center
+            detection.bbox.center.position.y = y_center
+            detection.bbox.size_x = bbox_width
+            detection.bbox.size_y = bbox_height
+            detections_msg.detections.append(detection)
 
-                # Draw bounding box on the frame
-                start_point = (int(prediction.x - prediction.width / 2), int(prediction.y - prediction.height / 2))
-                end_point = (int(prediction.x + prediction.width / 2), int(prediction.y + prediction.height / 2))
-                cv2.rectangle(annotated_frame, start_point, end_point, (0, 255, 0), 2)
-                cv2.putText(annotated_frame, prediction.class_name, start_point, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            # Desenhar bounding box
+            cv2.rectangle(annotated_frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+            cv2.putText(annotated_frame, f"QR: {decoded_text}", (x_min, y_min-10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+            # Atualizar informações para serviço de captura
+            self.last_qr_detected = True
+            self.last_qr_content = decoded_text
+            self.last_qr_bbox = (x_min, y_min, x_max, y_max)
+
+            # Salvar imagem do QR Code se habilitado
+            if self.save_images_enabled:
+                self.save_qr_image(frame, decoded_text, bbox, x_min, y_min, x_max, y_max)
+
+            # Publicar texto do QR Code
+            qr_string_msg = String()
+            qr_string_msg.data = decoded_text
+            self.qr_string_pub.publish(qr_string_msg)
+
         else:
-            # No detections: publish a default bounding box with zeros
+            # Nenhum QR Code detectado
+            self.last_qr_detected = False
+            self.last_qr_content = ""
+            self.last_qr_bbox = None
+            
             default_detection = Detection2D()
             default_detection.bbox = BoundingBox2D()
-            default_detection.bbox.center.position.x = 0.000
-            default_detection.bbox.center.position.y = 0.000
-            default_detection.bbox.size_x = 0.000
-            default_detection.bbox.size_y = 0.000
+            default_detection.bbox.center.position.x = 0.0
+            default_detection.bbox.center.position.y = 0.0
+            default_detection.bbox.size_x = 0.0
+            default_detection.bbox.size_y = 0.0
             detections_msg.detections.append(default_detection)
 
-        # Publish detections
+            # Publicar string vazia
+            qr_string_msg = String()
+            qr_string_msg.data = ""
+            self.qr_string_pub.publish(qr_string_msg)
+
+        # Publicar detecções
         self.qr_location_pub.publish(detections_msg)
 
-        # Publish the annotated image
+        # Publicar imagem anotada
         compressed_image_msg = CompressedImage()
         compressed_image_msg.header.stamp = self.get_clock().now().to_msg()
         compressed_image_msg.format = "jpeg"
         compressed_image_msg.data = np.array(cv2.imencode('.jpg', annotated_frame)[1]).tobytes()
         self.annotated_image_pub.publish(compressed_image_msg)
+        
+        # Decrementar cooldown
+        if self.save_cooldown > 0:
+            self.save_cooldown -= 1
 
-        # Decode QR codes for string content
-        decoded_strings = decode(raw_frame)
+    def save_qr_image(self, frame, qr_content, bbox_points, x_min, y_min, x_max, y_max):
+        """Salva a imagem do QR Code detectado"""
+        
+        # Verificar cooldown para evitar salvar o mesmo QR repetidamente
+        if (qr_content == self.last_saved_content and self.save_cooldown > 0) or not qr_content.strip():
+            return
+            
+        try:
+            # Timestamp para nome único
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # milliseconds
+            
+            # Nome do arquivo seguro (remover caracteres especiais do conteúdo do QR)
+            safe_content = "".join(c for c in qr_content if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            safe_content = safe_content[:50]  # Limitar tamanho
+            if not safe_content:
+                safe_content = "unknown_qr"
+            
+            # Salvar imagem completa com anotação
+            full_filename = f"qr_full_{timestamp}_{safe_content}.jpg"
+            full_path = os.path.join(self.save_directory, full_filename)
+            
+            # Criar imagem anotada
+            annotated_image = frame.copy()
+            cv2.rectangle(annotated_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 3)
+            cv2.putText(annotated_image, f"QR: {qr_content}", (x_min, y_min-15), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            
+            # Adicionar timestamp na imagem
+            cv2.putText(annotated_image, timestamp, (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            
+            cv2.imwrite(full_path, annotated_image)
+            
+            # Salvar também recorte do QR Code
+            margin = 20  # Margem ao redor do QR
+            crop_x_min = max(0, x_min - margin)
+            crop_y_min = max(0, y_min - margin) 
+            crop_x_max = min(frame.shape[1], x_max + margin)
+            crop_y_max = min(frame.shape[0], y_max + margin)
+            
+            cropped_qr = frame[crop_y_min:crop_y_max, crop_x_min:crop_x_max]
+            
+            crop_filename = f"qr_crop_{timestamp}_{safe_content}.jpg"
+            crop_path = os.path.join(self.save_directory, crop_filename)
+            cv2.imwrite(crop_path, cropped_qr)
+            
+            # Log do salvamento
+            self.get_logger().info(f"QR Code images saved:")
+            self.get_logger().info(f"  Full: {full_path}")
+            self.get_logger().info(f"  Crop: {crop_path}")
+            self.get_logger().info(f"  Content: '{qr_content}'")
+            
+            # Atualizar controle de cooldown
+            self.last_saved_content = qr_content
+            self.save_cooldown = self.cooldown_frames
+            
+        except Exception as e:
+            self.get_logger().error(f"Error saving QR Code image: {str(e)}")
 
-        if decoded_strings:
-            for qr in decoded_strings:
-                qr_string_msg = String()
-                qr_string_msg.data = qr.data.decode('utf-8')
-                self.qr_string_pub.publish(qr_string_msg)
-        else:
-            # Publish an empty string if no QR code is detected
-            qr_string_msg = String()
-            qr_string_msg.data = ""
-            self.qr_string_pub.publish(qr_string_msg)
+    def capture_qr_image_callback(self, request, response):
+        """Serviço para capturar imagem do QR Code sob demanda"""
+        
+        if self.last_frame is None:
+            response.success = False
+            response.message = "No frame available for capture"
+            return response
+            
+        if not self.last_qr_detected or not self.last_qr_bbox:
+            response.success = False  
+            response.message = "No QR Code currently detected"
+            return response
+            
+        try:
+            # Forçar salvamento da imagem atual
+            x_min, y_min, x_max, y_max = self.last_qr_bbox
+            
+            # Timestamp para captura manual
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            safe_content = "".join(c for c in self.last_qr_content if c.isalnum() or c in (' ', '-', '_')).rstrip()[:50]
+            if not safe_content:
+                safe_content = "manual_capture"
+                
+            # Salvar imagem completa
+            full_filename = f"qr_manual_{timestamp}_{safe_content}.jpg"
+            full_path = os.path.join(self.save_directory, full_filename)
+            
+            annotated_image = self.last_frame.copy()
+            cv2.rectangle(annotated_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 3)
+            cv2.putText(annotated_image, f"QR: {self.last_qr_content}", (x_min, y_min-15), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            cv2.putText(annotated_image, f"MANUAL CAPTURE - {timestamp}", (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            
+            cv2.imwrite(full_path, annotated_image)
+            
+            response.success = True
+            response.message = f"QR Code image saved: {full_path}\nContent: '{self.last_qr_content}'"
+            
+            self.get_logger().info(f"Manual QR Code capture: {full_path}")
+            
+        except Exception as e:
+            response.success = False
+            response.message = f"Error capturing QR Code: {str(e)}"
+            self.get_logger().error(f"Manual capture error: {str(e)}")
+            
+        return response
+
+    def __del__(self):
+        if hasattr(self, 'cap'):
+            self.cap.release()
 
 
 def main(args=None):

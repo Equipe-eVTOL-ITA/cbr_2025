@@ -1,0 +1,141 @@
+fase4_fsm:
+  ros__parameters:
+    # === Posições Home e Waypoints ===
+    fictual_home_x: 1.0
+    fictual_home_y: -1.0
+    fictual_home_z: -0.6 # Remember z points Down
+    
+    # Return Home
+    at_home: false
+    is_returning_home: false
+
+    # checkpoints
+    checkpoint_1_x: 3.0
+    checkpoint_1_y: -3.0
+    checkpoint_2_x: 5.0
+    checkpoint_2_y: -5.0
+    checkpoint_3_x: 7.0
+    checkpoint_3_y: -7.0
+    checkpoint_4_x: 9.0
+    checkpoint_4_y: -9.0
+    checkpoint_5_x: 11.0
+    checkpoint_5_y: -11.0
+    checkpoint_6_x: 13.0
+    checkpoint_6_y: -13.0
+    checkpoint_7_x: 15.0
+    checkpoint_7_y: -15.0
+    checkpoint_8_x: 17.0
+    checkpoint_8_y: -17.0
+    checkpoint_9_x: 19.0
+    checkpoint_9_y: -19.0
+    checkpoint_10_x: 21.0
+    checkpoint_10_y: -21.0
+    checkpoint_11_x: 23.0
+    checkpoint_11_y: -23.0
+    checkpoint_12_x: 25.0
+    checkpoint_12_y: -25.0
+    checkpoint_13_x: 27.0
+    checkpoint_13_y: -27.0
+    # index
+    checkpoint_index: 0.0
+
+
+    # === Alturas e Velocidades ===
+    mean_height: -1.0
+    takeoff_height: -1.5
+    max_vertical_velocity: 1.0
+    max_horizontal_velocity: 1.0
+    landing_velocity: 0.5
+    search_velocity: 0.5
+    max_yaw_rate: 0.5
+
+    # === Tolerâncias ===
+    position_tolerance: 0.07
+    takeoff_tolerance: 0.3        # Tolerância específica para takeoff (30cm)
+
+    # === Timeouts ===
+    detection_timeout: 10.0
+    landing_timeout: 7.0
+
+    # === Controladores PID - Posição ===
+    pid_pos_kp: 1.0
+    pid_pos_ki: 0.01
+    pid_pos_kd: 0.05
+    setpoint: 0.0
+
+    # === Controladores PID - Yaw (para packages) ===
+    pid_yaw_kp: 2.0
+    pid_yaw_ki: 0.0
+    pid_yaw_kd: 0.1
+    
+    # === Parâmetros de Visão ===
+    height_to_ground: 1.2
+    mean_base_height: 0.0
+    known_base_radius: 1.5
+
+    # === Estados e Flags ===
+    initial_takeoff_taken: false   # Flag se já decolou
+    current_checkpoint_index: 0.0      # Índice do checkpoint atual
+
+    # === Outras Configurações ===
+    descent_velocity: 0.15          # Velocidade de descida
+
+    # === Parâmetros Bouncing Search ===
+    up_height: -1.0                 # Altura para fases "UP" (metros, negativo para cima no NED)
+    down_height: -0.2               # Altura para fases "DOWN" (metros, negativo para baixo no NED)
+    middle_height: -0.5             # Altura para fases "MIDDLE" (metros, intermediária)
+
+    # parametros das janelas
+    janela_counter: 0.0
+    # bool: true é para janela alta e false é para janela baixa
+    janela_A: true
+    janela_B: false
+    janela_C: false
+    janela:D: true
+    janela_E: false
+    janela_F: true
+    janela_G: false
+    janela_H: true
+    # alturas esperadas em cada tipo de janela:
+    janela_alta_height: 1.0
+    janela_baixa_height: 0.5
+
+    # enter house state
+    enter_house_alined: false
+
+    # through window state
+    pass_through_speed: 0.3
+    pass_through_distance: 1.5
+    pass_through_tolerance: 0.2
+    pass_through_timeout: 10.0
+
+fase4_vision:
+  ros__parameters:
+    timeout: 10.0
+    
+    # === Parâmetros de Calibração da Câmera ===
+    # Camera intrinsics for 800x800 published image
+    fx: 1231.962  # Focal length X
+    fy: 1231.962  # Focal length Y  
+    cx: 400.0     # Principal point X (center)
+    cy: 400.0     # Principal point Y (center)
+    
+    # Image dimensions
+    image_width: 800
+    image_height: 800
+    
+    # Distortion coefficients (set to zero if using undistorted stream)
+    dist_k1: 0.0
+    dist_k2: 0.0
+    dist_p1: 0.0
+    dist_p2: 0.0
+    dist_k3: 0.0
+    
+    # === Extrinsics: Camera pose in BODY (FRD) frame ===
+    # For downward-facing camera: 90° pitch rotation
+    camera_roll: 0.0      # No roll rotation
+    camera_pitch: 1.5708  # 90° pitch down (π/2 radians)
+    camera_yaw: 0.0       # No yaw rotation
+    camera_tx: 0.0        # No translation in X (forward)
+    camera_ty: 0.0        # No translation in Y (right)  
+    camera_tz: 0.0        # No translation in Z (down)

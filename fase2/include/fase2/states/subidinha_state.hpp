@@ -9,12 +9,12 @@ private:
 public:
     SubidinhaState() : fsm::State() {}
 
-    void on_enter(fsm::Blackboard &bb) {
+    void on_enter(fsm::Blackboard &bb) override {
         this->drone = *bb.get<std::shared_ptr<Drone>>("drone");
         if(this->drone == nullptr) return;
     }
 
-    std::string act(fsm::Blackboard &bb){
+    std::string act(fsm::Blackboard &bb) override {
         (void) bb;
         // subindo um pouco para tentar achar a base
         Eigen::Vector3d new_pos = this->drone->getLocalPosition();
