@@ -13,14 +13,14 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    pkg_fase2       = get_package_share_directory('cbr_fase2')
-    onboard_params  = os.path.join(pkg_fase2, "config", "onboard.yaml")
-    fsm_params     = os.path.join(pkg_fase2, "config", "fsm.yaml")
-    vision_params   = os.path.join(pkg_fase2, "config", "vision.yaml")
+    pkg_fase4       = get_package_share_directory('cbr_fase4')
+    onboard_params  = os.path.join(pkg_fase4, "config", "onboard.yaml")
+    fsm_params     = os.path.join(pkg_fase4, "config", "fsm.yaml")
+    vision_params   = os.path.join(pkg_fase4, "config", "vision.yaml")
 
     exec_arg = DeclareLaunchArgument(
         "mission",
-        default_value="fase2",
+        default_value="fase4",
         description="Executable that implements the mission FSM")
     
 
@@ -48,28 +48,10 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Base detector node (using new target_detector framework)
-    base_detector_node = Node(
-        package='cbr_cv_utils',
-        executable='target_base_detector',
-        parameters=[vision_params],
-        output='screen'
-    )
-
-    # Package detector node (delayed slightly to avoid conflicts)
-    package_detector_node = Node(
-        package='cbr_cv_utils',
-        executable='target_package_detector',
-        parameters=[vision_params],
-        output='screen'
-    )
-
-    # Delay package detector by 1 second after base detector
-    delayed_package_detector = TimerAction(period=1.0, actions=[package_detector_node])
 
     # FSM node with GDB debug support
     fsm_node = Node(
-        package='cbr_fase2',
+        package='cbr_fase4',
         executable=LaunchConfiguration("mission"),
         prefix='gdb --args',  # String simples funciona melhor
         parameters=[fsm_params],
@@ -83,7 +65,6 @@ def generate_launch_description():
         system_health_node,
         telemetry_recorder_node,        
         # camera_node,
-        base_detector_node,
-        delayed_package_detector,
+        # Removed base/package detectors
         delayed_fsm_node
     ])

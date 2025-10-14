@@ -1,5 +1,28 @@
-# Onboard computer
+# Onboard computer configuration for CBR 2025 Fase4
 
+# OAK-D Camera Configuration for FRONTAL depth camera (window detection)
+oak:
+  ros__parameters:
+    # Depth camera configuration (FRONTAL facing for window detection)
+    enable_depth: true
+    depth_topic: "/depth_camera/compressedDepth"
+    depth_fps: 30
+    depth_resolution: "720p"
+    depth_width: 800
+    depth_height: 800
+    
+    # RGB camera (optional for debugging)
+    enable_rgb: false
+    rgb_topic: "/depth_camera/rgb/compressed"
+    
+    # Camera position (frontal)
+    camera_position: "front"
+    
+    # Publishing configuration
+    publish_compressed: true
+    compression_quality: 80
+
+# Legacy RGB publisher (if needed)
 oak_rgb_publisher:
   ros__parameters:
     publish_raw: false
@@ -10,54 +33,34 @@ oak_rgb_publisher:
     auto_exposure_compensation: 1
 
 
-base_detector:
+# WindowDetector Configuration for Frontal Depth Camera
+window_detector:
   ros__parameters:
-    # Image subscription and Detector publisher topics
-    image_topic: 'vertical_camera/image/compressed'
-    detection_topic: '/vertical_camera/classification'
+    # FRONTAL depth camera topics
+    image_topic: '/depth_camera/compressedDepth'
+    detection_topic: '/window_found'
+    centroid_topic: '/centroid'
+    threshold_topic: '/threshold'
+    
+    # Debug mode configuration
+    debug_mode: true
+    debug_topic: '/telemetry/window_debug/compressed'
+    debug_size: 400      # Resize debug images to 400x400 for bandwidth
+    debug_quality: 75    # JPEG compression quality
 
-    # Full debug mode
-    full_debug_mode: false
-
-    # Light debug mode
-    light_debug_mode: true
-    light_debug_topic: '/telemetry/camera_debug/compressed'
-    light_debug_size: 400  # Resize debug images to 400x400 for bandwidth
-    light_debug_quality: 75  # JPEG compression quality (75% for good quality/size balance)
+# QRCodeDetector Configuration for Frontal Depth Camera
+qr_code_detector:
+  ros__parameters:
+    # FRONTAL depth camera topics
+    image_topic: '/depth_camera/compressedDepth'
+    detection_topic: '/vertical_classification'
+    qr_string_topic: '/qr_code_string'
     
-    # Morphological operations (color-specific)
-    yellow_morph_kernel_size: 3
-    yellow_morph_iterations: 2
-    blue_morph_kernel_size: 5
-    blue_morph_iterations: 3
-    
-    # HSV color ranges (same as base_detector)
-    blue_lower_h: 100
-    blue_lower_s: 80
-    blue_lower_v: 40
-    blue_upper_h: 130
-    blue_upper_s: 255
-    blue_upper_v: 255
-    
-    yellow_lower_h: 20
-    yellow_lower_s: 120
-    yellow_lower_v: 70
-    yellow_upper_h: 30
-    yellow_upper_s: 255
-    yellow_upper_v: 255
-    
-    # Detection constraints for combined regions
-    combined_min_area: 0.04
-    combined_max_area: 1.0
-    combined_aspect_ratio_min: 0.5
-    combined_aspect_ratio_max: 2.0
-    
-    # Dilation parameters for combining adjacent color regions
-    combination_kernel_size: 15
-    combination_iterations: 1
-    
-    # Non-maximum suppression for concentric detections
-    nms_center_distance_threshold: 0.1  # Normalized distance threshold (10% of diagonal)
+    # Debug mode configuration  
+    debug_mode: true
+    debug_topic: '/telemetry/qr_debug/compressed'
+    debug_size: 400      # Resize debug images to 400x400 for bandwidth
+    debug_quality: 75    # JPEG compression quality
 
 telemetry_recorder:
   ros__parameters:

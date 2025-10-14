@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(cbr_cv_utils)
+project(cbr_2025_cv_utils)
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)

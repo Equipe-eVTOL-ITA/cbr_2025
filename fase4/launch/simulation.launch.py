@@ -14,15 +14,17 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    pkg_fase2       = get_package_share_directory('cbr_fase2')
-    simulation_params  = os.path.join(pkg_fase2, "config", "simulation.yaml")
-    fsm_params     = os.path.join(pkg_fase2, "config", "fsm.yaml")
-    rviz_cfg = os.path.join(pkg_fase2, 'launch', 'simulation.rviz')
+    pkg_fase4       = get_package_share_directory('cbr_fase4')
+    simulation_params  = os.path.join(pkg_fase4, "config", "simulation.yaml")
+    fsm_params     = os.path.join(pkg_fase4, "config", "fsm.yaml")
+    rviz_cfg = os.path.join(pkg_fase4, 'launch', 'simulation.rviz')
+    vision_params   = os.path.join(pkg_fase4, "config", "vision.yaml")
 
     exec_arg = DeclareLaunchArgument(
         "mission",
-        default_value="fase2",
-        description="Executable that implements the mission FSM")
+        default_value="fase4",
+        description="Executable that implements the mission FSM"
+    )
     
     # Telemetry Handler - core telemetry processing
     telemetry_handler_node = Node(
@@ -64,21 +66,42 @@ def generate_launch_description():
         output='screen'
     )
 
-        # Base detector node (using new target_detector framework)
-    base_detector_node = Node(
-        package='cbr_cv_utils',
-        executable='target_base_detector',
-        parameters=[simulation_params],
-        remappings=[
-            ('/vertical_camera/image_raw', '/vertical_camera')
+    # Gazebo-ROS2 Camera Bridge (keep only depth camera used by window detector)
+    camera_bridge_node = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/depth_camera@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/depth_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo'
         ],
-        output='screen'
+        output='screen',
+        remappings=[
+            ('/depth_camera', '/depth_camera/image_raw')
+        ]
     )
 
     fsm_node = Node(
-        package='cbr_fase2',
+        package='cbr_fase4',
         executable=LaunchConfiguration("mission"),
         parameters=[fsm_params],
+        output='screen'
+    )
+
+    # Vision nodes (only window + QR)
+    window_detector_node = Node(
+        package='cbr_2025_cv_utils',
+        executable='window_detector',
+        parameters=[vision_params],
+        output='screen'
+    )
+
+    qr_code_detector_node = Node(
+        package='cbr_2025_cv_utils',
+        executable='qr_code_detector',
+        parameters=[
+            vision_params,
+            {'image_topic': '/oak/camera/image/raw', 'use_compressed': False}
+        ],
         output='screen'
     )
 
@@ -90,7 +113,9 @@ def generate_launch_description():
         telemetry_dashboard_node,
         telemetry_recorder_node,
         rviz_node,
-        system_health_node,        
-        base_detector_node,
-        delayed_fsm_node
+        system_health_node,
+        camera_bridge_node,
+        delayed_fsm_node,
+        window_detector_node,
+        qr_code_detector_node
     ])

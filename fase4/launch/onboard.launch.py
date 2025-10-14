@@ -40,17 +40,17 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Camera node
-    camera_node = Node(
-        package='camera_publisher',
-        executable='oak',
-        parameters=[onboard_params],
+        # Vision nodes
+    window_detector_node = Node(
+        package='cbr_2025_cv_utils',
+        executable='window_detector',
+        parameters=[vision_params],
         output='screen'
     )
 
-    window_detector_node = Node(
-        package='cbr_cv_utils',
-        executable='target_window_detector',
+    qr_code_detector_node = Node(
+        package='cbr_2025_cv_utils',
+        executable='qr_code_detector',
         parameters=[vision_params],
         output='screen'
     )
@@ -68,7 +68,8 @@ def generate_launch_description():
         exec_arg,
         system_health_node,
         telemetry_recorder_node,        
-        # camera_node,
+        # Camera not launched here; using external feed
         window_detector_node,
+        qr_code_detector_node,
         delayed_fsm_node
     ])

@@ -34,7 +34,7 @@ public:
         // Check if the drone is armed
         this->drone->log("Checking everything before flight...");
         if (this->drone->getArmingState() == DronePX4::ARMING_STATE::ARMED) {
-            this->drone->log("Drone armed successfully.");
+            this->drone->log("Drone armed sucessfully.");
             return "ARMED";
         }
 

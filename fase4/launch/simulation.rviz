@@ -63,21 +63,21 @@ Visualization Manager:
       Class: rviz_default_plugins/Path
       Color: 25; 255; 0
       Enabled: true
-      Head Diameter: 0.30000001192092896
-      Head Length: 0.20000000298023224
-      Length: 0.30000001192092896
+      Head Diameter: 0.3
+      Head Length: 0.2
+      Length: 0.3
       Line Style: Lines
-      Line Width: 0.029999999329447746
-      Name: Path
+      Line Width: 0.03
+      Name: Drone Path
       Offset:
         X: 0
         Y: 0
         Z: 0
       Pose Color: 255; 85; 255
       Pose Style: None
-      Radius: 0.029999999329447746
-      Shaft Diameter: 0.10000000149011612
-      Shaft Length: 0.10000000149011612
+      Radius: 0.03
+      Shaft Diameter: 0.1
+      Shaft Length: 0.1
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -88,15 +88,15 @@ Visualization Manager:
       Value: true
     - Alpha: 1
       Axes Length: 1
-      Axes Radius: 0.10000000149011612
+      Axes Radius: 0.1
       Class: rviz_default_plugins/Pose
       Color: 255; 25; 0
       Enabled: true
-      Head Length: 0.30000001192092896
-      Head Radius: 0.10000000149011612
-      Name: Pose
+      Head Length: 0.3
+      Head Radius: 0.1
+      Name: Drone Pose
       Shaft Length: 1
-      Shaft Radius: 0.05000000074505806
+      Shaft Radius: 0.05
       Shape: Arrow
       Topic:
         Depth: 5
@@ -130,212 +130,14 @@ Visualization Manager:
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: Image
+      Name: Window Annotated
       Normalize Range: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /base_detector/mask_debug
-      Value: true
-    - Class: rviz_default_plugins/Image
-      Enabled: true
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Image
-      Normalize Range: true
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /base_detector/bbox_debug
-      Value: true
-    - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
-      Name: MarkerArray
-      Namespaces:
-        estimate_1: true
-        estimate_10: true
-        estimate_100: true
-        estimate_101: true
-        estimate_102: true
-        estimate_103: true
-        estimate_104: true
-        estimate_105: true
-        estimate_106: true
-        estimate_107: true
-        estimate_108: true
-        estimate_109: true
-        estimate_11: true
-        estimate_110: true
-        estimate_111: true
-        estimate_112: true
-        estimate_113: true
-        estimate_114: true
-        estimate_115: true
-        estimate_116: true
-        estimate_117: true
-        estimate_118: true
-        estimate_119: true
-        estimate_12: true
-        estimate_120: true
-        estimate_121: true
-        estimate_122: true
-        estimate_123: true
-        estimate_124: true
-        estimate_125: true
-        estimate_126: true
-        estimate_127: true
-        estimate_128: true
-        estimate_129: true
-        estimate_13: true
-        estimate_130: true
-        estimate_131: true
-        estimate_132: true
-        estimate_133: true
-        estimate_134: true
-        estimate_135: true
-        estimate_136: true
-        estimate_137: true
-        estimate_138: true
-        estimate_139: true
-        estimate_14: true
-        estimate_140: true
-        estimate_141: true
-        estimate_142: true
-        estimate_143: true
-        estimate_144: true
-        estimate_145: true
-        estimate_146: true
-        estimate_147: true
-        estimate_148: true
-        estimate_149: true
-        estimate_15: true
-        estimate_150: true
-        estimate_151: true
-        estimate_152: true
-        estimate_153: true
-        estimate_154: true
-        estimate_155: true
-        estimate_156: true
-        estimate_157: true
-        estimate_158: true
-        estimate_159: true
-        estimate_16: true
-        estimate_160: true
-        estimate_161: true
-        estimate_162: true
-        estimate_163: true
-        estimate_164: true
-        estimate_165: true
-        estimate_166: true
-        estimate_167: true
-        estimate_168: true
-        estimate_17: true
-        estimate_18: true
-        estimate_19: true
-        estimate_2: true
-        estimate_20: true
-        estimate_21: true
-        estimate_22: true
-        estimate_23: true
-        estimate_24: true
-        estimate_25: true
-        estimate_26: true
-        estimate_27: true
-        estimate_28: true
-        estimate_29: true
-        estimate_3: true
-        estimate_30: true
-        estimate_31: true
-        estimate_32: true
-        estimate_33: true
-        estimate_34: true
-        estimate_35: true
-        estimate_36: true
-        estimate_37: true
-        estimate_38: true
-        estimate_39: true
-        estimate_4: true
-        estimate_40: true
-        estimate_41: true
-        estimate_42: true
-        estimate_43: true
-        estimate_44: true
-        estimate_45: true
-        estimate_46: true
-        estimate_47: true
-        estimate_48: true
-        estimate_49: true
-        estimate_5: true
-        estimate_50: true
-        estimate_51: true
-        estimate_52: true
-        estimate_53: true
-        estimate_54: true
-        estimate_55: true
-        estimate_56: true
-        estimate_57: true
-        estimate_58: true
-        estimate_59: true
-        estimate_6: true
-        estimate_60: true
-        estimate_61: true
-        estimate_62: true
-        estimate_63: true
-        estimate_64: true
-        estimate_65: true
-        estimate_66: true
-        estimate_67: true
-        estimate_68: true
-        estimate_69: true
-        estimate_7: true
-        estimate_70: true
-        estimate_71: true
-        estimate_72: true
-        estimate_73: true
-        estimate_74: true
-        estimate_75: true
-        estimate_76: true
-        estimate_77: true
-        estimate_78: true
-        estimate_79: true
-        estimate_8: true
-        estimate_80: true
-        estimate_81: true
-        estimate_82: true
-        estimate_83: true
-        estimate_84: true
-        estimate_85: true
-        estimate_86: true
-        estimate_87: true
-        estimate_88: true
-        estimate_89: true
-        estimate_9: true
-        estimate_90: true
-        estimate_91: true
-        estimate_92: true
-        estimate_93: true
-        estimate_94: true
-        estimate_95: true
-        estimate_96: true
-        estimate_97: true
-        estimate_98: true
-        estimate_99: true
-        known_base_0: true
-        known_base_1: true
-        known_base_2: true
-        known_base_3: true
-        known_base_4: true
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /base_markers
+        Value: /window_detector/annotated
       Value: true
   Enabled: true
   Global Options:
