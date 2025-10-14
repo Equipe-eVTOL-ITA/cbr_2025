@@ -2,8 +2,8 @@
 
 oak_rgb_publisher:
   ros__parameters:
-    publish_raw: true
-    publish_compressed: false
+    publish_raw: false
+    publish_compressed: true
     width: 800
     height: 800
     fps: 10
@@ -13,7 +13,7 @@ oak_rgb_publisher:
 base_detector:
   ros__parameters:
     # Image subscription and Detector publisher topics
-    image_topic: '/vertical_camera'
+    image_topic: 'vertical_camera/image/compressed'
     detection_topic: '/vertical_camera/classification'
 
     # Full debug mode
@@ -55,6 +55,9 @@ base_detector:
     # Dilation parameters for combining adjacent color regions
     combination_kernel_size: 15
     combination_iterations: 1
+    
+    # Non-maximum suppression for concentric detections
+    nms_center_distance_threshold: 0.1  # Normalized distance threshold (10% of diagonal)
 
 telemetry_recorder:
   ros__parameters:

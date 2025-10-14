@@ -31,7 +31,7 @@ class BaseDetector(TargetDetector):
     def _declare_ros_parameters(self):
         """Override to set base_detector specific default topics"""
         # Image subscription and detection publishing
-        self.declare_parameter('image_topic', '/vertical_camera/image_raw')
+        self.declare_parameter('image_topic', 'vertical_camera/image/compressed')
         self.declare_parameter('detection_topic', '/base_detector/detections')  # Base detector specific topic
     
     def _setup_color_parameters(self):
@@ -41,8 +41,8 @@ class BaseDetector(TargetDetector):
         blue_upper = {'h': 130, 's': 255, 'v': 255}
         
         # Default HSV ranges for yellow  
-        yellow_lower = {'h': 20, 's': 100, 'v': 100}
-        yellow_upper = {'h': 30, 's': 255, 'v': 255}
+        yellow_lower = {'h': 10, 's': 100, 'v': 100}
+        yellow_upper = {'h': 40, 's': 255, 'v': 255}
         
         # Setup parameters for both colors
         self.blue_lower, self.blue_upper, self.blue_kernel_size, self.blue_iterations = \
@@ -58,6 +58,9 @@ class BaseDetector(TargetDetector):
         self.declare_parameter('combined_aspect_ratio_max', 2.0)
         self.declare_parameter('combination_kernel_size', 15)
         self.declare_parameter('combination_iterations', 2)
+        
+        # Non-maximum suppression for concentric detections
+        self.declare_parameter('nms_center_distance_threshold', 0.1)  # Normalized distance threshold
     
     def _initialize_color_ranges(self):
         """Initialize color detection parameters from ROS parameters"""
@@ -67,6 +70,7 @@ class BaseDetector(TargetDetector):
         self.combined_aspect_ratio_max = float(self.get_parameter('combined_aspect_ratio_max').value)
         self.combination_kernel_size = int(self.get_parameter('combination_kernel_size').value)
         self.combination_iterations = int(self.get_parameter('combination_iterations').value)
+        self.nms_center_distance_threshold = float(self.get_parameter('nms_center_distance_threshold').value)
     
     def detect(self, image: np.ndarray) -> Tuple[List[Dict], Dict]:
         """
@@ -90,6 +94,9 @@ class BaseDetector(TargetDetector):
         
         # Find regions containing both colors
         detections = self._find_combined_regions(blue_mask, yellow_mask)
+        
+        # Filter concentric detections (keep largest area)
+        detections = self._filter_concentric_detections(detections, image.shape)
         
         # Draw detections on bbox debug image
         if 'bbox_debug' in debug_images:
@@ -221,6 +228,66 @@ class BaseDetector(TargetDetector):
             detections.append(detection)
         
         return detections
+    
+    def _filter_concentric_detections(self, detections: List[Dict], image_shape: Tuple[int, int, int]) -> List[Dict]:
+        """
+        Filter out concentric detections, keeping only the one with largest area
+        
+        Args:
+            detections: List of detection dictionaries
+            image_shape: Shape of the image (height, width, channels)
+            
+        Returns:
+            Filtered list of detections without concentric duplicates
+        """
+        if len(detections) <= 1:
+            return detections
+        
+        img_height, img_width = image_shape[:2]
+        img_diagonal = np.sqrt(img_height**2 + img_width**2)
+        
+        # Convert threshold from normalized to pixels
+        distance_threshold_pixels = self.nms_center_distance_threshold * img_diagonal
+        
+        # Sort by area (largest first) to prioritize larger detections
+        sorted_detections = sorted(detections, key=lambda x: x['area'], reverse=True)
+        
+        # List to store filtered detections
+        filtered_detections = []
+        
+        for current_det in sorted_detections:
+            cx_current, cy_current = current_det['center']
+            is_concentric = False
+            
+            # Check if current detection is concentric with any already accepted detection
+            for accepted_det in filtered_detections:
+                cx_accepted, cy_accepted = accepted_det['center']
+                
+                # Calculate Euclidean distance between centers
+                distance = np.sqrt((cx_current - cx_accepted)**2 + (cy_current - cy_accepted)**2)
+                
+                if distance < distance_threshold_pixels:
+                    # Current detection is concentric with an already accepted (larger) detection
+                    is_concentric = True
+                    self.get_logger().debug(
+                        f"Filtered concentric detection: area={current_det['area']:.0f} "
+                        f"(kept larger with area={accepted_det['area']:.0f}, distance={distance:.1f}px)"
+                    )
+                    break
+            
+            # Only add if not concentric with any larger detection
+            if not is_concentric:
+                filtered_detections.append(current_det)
+        
+        # Log filtering results
+        num_filtered = len(detections) - len(filtered_detections)
+        if num_filtered > 0:
+            self.get_logger().info(
+                f"Filtered {num_filtered} concentric detection(s). "
+                f"Kept {len(filtered_detections)}/{len(detections)} detections."
+            )
+        
+        return filtered_detections
     
     def _draw_detections_on_image(self, image: np.ndarray, detections: List[Dict]):
         """Draw detection bounding boxes and info on image"""

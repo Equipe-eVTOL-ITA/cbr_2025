@@ -51,7 +51,7 @@ fase4_vision:
 base_detector:
   ros__parameters:
     # Image topics
-    image_topic: "/vertical_camera"
+    image_topic: "vertical_camera/image/compressed"
     detection_topic: "/base_detector/detections"
     
     # Blue color HSV ranges
@@ -82,6 +82,9 @@ base_detector:
     combination_kernel_size: 15
     combination_iterations: 2
     
+    # Non-maximum suppression for concentric detections
+    nms_center_distance_threshold: 0.1  # Normalized distance threshold (10% of diagonal)
+    
     # Debug configuration
     full_debug_mode: false
     light_debug_mode: true
@@ -93,7 +96,7 @@ base_detector:
 package_detector:
   ros__parameters:
     # Image topics
-    image_topic: "/vertical_camera"
+    image_topic: "vertical_camera/image/compressed"
     detection_topic: "/package_detector/detections"
     
     # Gray color HSV ranges for packages
@@ -115,6 +118,8 @@ package_detector:
     
     # Debug configuration
     full_debug_mode: false
+    mask_debug_topic: '/package_detector/mask_debug'
+    bbox_debug_topic: '/package_detector/bbox_debug'
     light_debug_mode: true
     light_debug_topic: "/telemetry/package_debug/compressed"
     light_debug_size: 400

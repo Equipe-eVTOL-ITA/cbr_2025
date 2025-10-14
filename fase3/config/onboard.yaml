@@ -2,8 +2,8 @@
 
 oak_rgb_publisher:
   ros__parameters:
-    publish_raw: true
-    publish_compressed: false
+    publish_raw: false
+    publish_compressed: true
     width: 800
     height: 800
     fps: 10

@@ -54,7 +54,7 @@ class TargetDetector(Node, ABC):
     def _declare_ros_parameters(self):
         """Declare common ROS parameters for all detectors"""
         # Image subscription and detection publishing
-        self.declare_parameter('image_topic', '/vertical_camera/image_raw')
+        self.declare_parameter('image_topic', 'vertical_camera/image/compressed')
         self.declare_parameter('detection_topic', '/detections')
     
     def _load_ros_parameters(self):
@@ -64,19 +64,34 @@ class TargetDetector(Node, ABC):
 
     def _setup_ros_interface(self):
         """Setup ROS subscribers and publishers"""
-        # Subscriber for camera images
+        # QoS profile for image subscription (BEST_EFFORT for camera compatibility)
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+        image_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=10
+        )
+        
+        # QoS profile for detection publishing (RELIABLE for guaranteed delivery)
+        detection_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=10
+        )
+        
+        # Subscriber for camera images (compressed)
         self.image_sub = self.create_subscription(
-            Image,
+            CompressedImage,
             self.image_topic,
             self.image_callback,
-            10
+            image_qos
         )
         
         # Publisher for detections
         self.detection_pub = self.create_publisher(
             Detection2DArray,
             self.detection_topic,
-            10
+            detection_qos
         )
 
     def setup_color_parameters(self, color_name: str, lower_hsv: dict[str, int], upper_hsv: dict[str, int], kernel_size: int = 3, iterations: int = 2):
@@ -112,10 +127,10 @@ class TargetDetector(Node, ABC):
         
         return lower, upper, kernel_size_loaded, iterations_loaded
 
-    def image_callback(self, msg: Image):
+    def image_callback(self, msg: CompressedImage):
         try:
-            # converte a imagem ROS para OpenCV
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            # converte a imagem comprimida ROS para OpenCV
+            cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
             self.last_image_shape = cv_image.shape # dimensoes
 
@@ -224,7 +239,7 @@ class ImageDebug():
     def _declare_ros_parameters(self):
         """Declare debug-related ROS parameters"""
         # Full debug mode
-        self.detector_node.declare_parameter('full_debug_mode', False)
+        self.detector_node.declare_parameter('full_debug_mode', True)
         self.detector_node.declare_parameter('mask_debug_topic', '/base_detector/mask_debug')
         self.detector_node.declare_parameter('bbox_debug_topic', '/base_detector/bbox_debug')
 
@@ -249,14 +264,22 @@ class ImageDebug():
 
     def _setup_publishers(self):
         """Setup ROS publishers for debug images"""
+        # QoS profile for debug publishers (BEST_EFFORT for low latency)
+        from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+        debug_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=10
+        )
+        
         if self.full_debug_mode:
             self.detector_node.get_logger().info("Full debug mode enabled.")
-            self.mask_debug_pub = self.detector_node.create_publisher(Image, self.mask_debug_topic, 10)
-            self.bbox_debug_pub = self.detector_node.create_publisher(Image, self.bbox_debug_topic, 10)
+            self.mask_debug_pub = self.detector_node.create_publisher(Image, self.mask_debug_topic, debug_qos)
+            self.bbox_debug_pub = self.detector_node.create_publisher(Image, self.bbox_debug_topic, debug_qos)
 
         if self.light_debug_mode:
             self.detector_node.get_logger().info("Light debug mode enabled.")
-            self.telemetry_debug_pub = self.detector_node.create_publisher(CompressedImage, self.light_debug_topic, 10)
+            self.telemetry_debug_pub = self.detector_node.create_publisher(CompressedImage, self.light_debug_topic, debug_qos)
     
     def _create_telemetry_debug_image(self, original_image: np.ndarray, debug_images: Dict, 
                                      detections: List[Dict], header) -> np.ndarray:

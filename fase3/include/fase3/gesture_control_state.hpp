@@ -12,6 +12,7 @@
 #include "drone/Drone.hpp"
 #include "fsm/fsm.hpp"
 #include "PidController.hpp"
+#include "transformations.hpp"
 
 class GestureControlState : public fsm::State {
 public:
@@ -166,23 +167,27 @@ private:
     void handleGesture(const std::string &gesture) {
 
         // Debug
-        
-
         if (counter++ % 5 == 0){
             this->drone->log("INSIDE HANDLE\n");
         }
 
-        if (gesture == "Closed_Fist") {
-            drone->setLocalVelocity(-this->control_speed_, 0.0, this->climb_rate, this->yaw_rate); // Closed Fist -> Backward
+        Eigen::Vector3d v;
+        Eigen::Vector3d relative_v;
+
+        if (gesture == "Closed_Fist") { 
+            v = {-this->control_speed_, 0.0, this->climb_rate}; // Closed Fist -> Backwards
         } else if (gesture == "Pointing_Up") {
-            drone->setLocalVelocity(this->control_speed_, 0.0, this->climb_rate, this->yaw_rate); // Pointing Up -> Forward
+            v = {this->control_speed_, 0.0, this->climb_rate}; // Pointing Up -> Forward
         } else if (gesture == "Victory") {
-            drone->setLocalVelocity(0.0, this->control_speed_, this->climb_rate, this->yaw_rate); // Victory -> Right
+            v = {0.0, this->control_speed_, this->climb_rate}; // Victory -> Right
         } else if (gesture == "ILoveYou") {
-            drone->setLocalVelocity(0.0, -this->control_speed_, this->climb_rate, this->yaw_rate); // I Love You -> Left
+            v = {0.0, -this->control_speed_, this->climb_rate}; // I Love You -> Left
         } else {
-            drone->setLocalVelocity(0.0, 0.0, this->climb_rate, this->yaw_rate); // Other gestures -> Follow 1st hand
+            v = {0.0, 0.0, this->climb_rate}; // I Love You -> Left
         }
+        
+        relative_v = adjust_velocity_using_yaw(v, this->drone->getOrientation()[2]);
+        drone->setLocalVelocity(relative_v.x(), relative_v.y(), relative_v.z(), this->yaw_rate); 
     }
 
     // Update HandLocation buffer

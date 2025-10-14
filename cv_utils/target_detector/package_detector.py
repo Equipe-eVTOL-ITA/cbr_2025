@@ -33,7 +33,7 @@ class PackageDetector(TargetDetector):
     def _declare_ros_parameters(self):
         """Override to set package_detector specific default topics"""
         # Image subscription and detection publishing
-        self.declare_parameter('image_topic', '/vertical_camera/image_raw')
+        self.declare_parameter('image_topic', 'vertical_camera/image/compressed')
         self.declare_parameter('detection_topic', '/package_detector/detections')  # Package detector specific topic
     
     def _setup_color_parameters(self):
